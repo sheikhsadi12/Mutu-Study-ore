@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Printer, Heart, Send, MessageCircle } from 'lucide-react';
+import { Heart, Send, MessageCircle, Maximize2, X } from 'lucide-react';
 import { Note, Comment, LikeState } from '../types';
 
 interface NoteViewProps {
   note: Note;
   onBack: () => void;
+  isDarkMode?: boolean;
 }
 
-export function NoteView({ note, onBack }: NoteViewProps) {
+export function NoteView({ note, onBack, isDarkMode = false }: NoteViewProps) {
   // LocalStorage State for Likes
   const [likes, setLikes] = useState<LikeState>(() => {
     try {
@@ -31,7 +32,7 @@ export function NoteView({ note, onBack }: NoteViewProps) {
     const isMock = note.id.startsWith('n');
     return isMock ? [
       {
-        id: crypto.randomUUID(),
+        id: 'mock-comment-' + note.id,
         noteId: note.id,
         authorName: 'Sheikh Sadi',
         content: 'This module perfectly covers the core principles. Note the equation derivations carefully.',
@@ -41,6 +42,7 @@ export function NoteView({ note, onBack }: NoteViewProps) {
   });
 
   const [newComment, setNewComment] = useState('');
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Persist Likes
@@ -77,95 +79,104 @@ export function NoteView({ note, onBack }: NoteViewProps) {
     setNewComment('');
   };
 
-  // Setup basic html layout to inject into iframe for raw HTML rendering
-  const iframeContent = `
-    <!DOCTYPE html>
-    <html class="${note.type === 'STATIC_A4' ? 'bg-[#f0e6dd]' : 'bg-white'}">
-      <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <style>
-          @import url('https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Scheherazade+New:wght@400;500;600;700&display=swap');
-          body { 
-            font-family: 'Hind Siliguri', sans-serif; 
-            color: #2d1610; 
-            margin: 0; 
-            line-height: 1.6;
-            ${note.type === 'STATIC_A4' ? 'padding: 24px; display: flex; justify-content: center;' : 'padding: 0; min-height: 100vh; background: #fffdf9;'}
-          }
-          * { box-sizing: border-box; }
-          .a4-container { 
-            background: white; 
-            width: 100%; 
-            max-width: 800px; 
-            min-height: 100vh;
-            padding: 48px; 
-            box-shadow: 0 4px 15px rgba(0,0,0,0.05); 
-            border-radius: 4px;
-            border: 1px solid #e8c3a2;
-          }
-          h1, h2, h3 { font-family: 'Playfair Display', serif; color: #4C0519; margin-top: 0; }
-          .arabic-text { font-family: 'Scheherazade New', serif; font-size: 1.1em; line-height: normal; }
-          .hero { text-align: center; margin-bottom: 24px; padding-bottom: 24px; border-bottom: 2px solid #e8c3a2; }
-          @media print {
-            body { padding: 0; background: white; }
-            .a4-container { box-shadow: none; border: none; padding: 0; max-width: none; }
-          }
-        </style>
-      </head>
-      <body>
-        <div class="${note.type === 'STATIC_A4' ? 'a4-container' : 'full-container'}">
-          <div class="hero">
-            <h1>${note.title}</h1>
-            <p style="color: #7C2D12; text-transform: uppercase; font-size: 0.85em; letter-spacing: 1px;">${note.category} • Module Reference</p>
-          </div>
-          <div>${note.sourceUrl}</div>
-        </div>
-      </body>
-    </html>
-  `;
+  // Dynamic Iframe Theme Syncing
+  const getThemedHtml = (rawHtml: string, isDark: boolean) => {
+    if (!rawHtml) return '';
+    if (rawHtml.startsWith('data:application/pdf')) return rawHtml;
+
+    let html = rawHtml;
+
+    if (isDark) {
+      const stylesToInject = `
+   <style>
+     /* 1. Global Dark Background & Light Text */
+     html, body { background-color: #120206 !important; color: #f5ebe6 !important; }
+     
+     /* 2. Aggressive Light-Background Overrides */
+     .bg-white, .bg-slate-50, .bg-slate-100, .bg-rose-50, .bg-emerald-50, .bg-[#fffdf9], .bg-[#fbf7f4], .bg-[#fcf8f5], .bg-[#fff8f3], .bg-[#fffdfb] { 
+         background-color: #1a080c !important; 
+     }
+     
+     /* 3. Aggressive Dark-Text Overrides */
+     .text-slate-800, .text-slate-900, .text-slate-700, .text-slate-600, .text-slate-500, .text-[#2d1610], .text-[#3d1a10] { 
+         color: #f5ebe6 !important; 
+     }
+     
+     /* 4. Aggressive Border Overrides */
+     .border, .border-slate-100, .border-slate-200, .border-slate-150, .border-[#e1c7b3], .border-[#e8c3a2], .border-[#f2dfd1] { 
+         border-color: #4C0519 !important; 
+     }
+     
+     /* 5. Brand Color Adjustments for Dark Contrast */
+     .text-rose-600, .text-rose-700, .text-[#b91c1c], .text-[#4C0519] { color: #ff4d4d !important; }
+     .text-emerald-700 { color: #4ade80 !important; }
+     .text-indigo-600, .text-indigo-700, .text-indigo-900, .text-indigo-805 { color: #a5b4fc !important; }
+     
+     /* 6. Fix Tables and Complex Containers */
+     table, th, td, .passage-card, .qa-box, .summary-box, .author-info-box, .explain-wrapper {
+         background-color: transparent !important;
+         border-color: #4C0519 !important;
+         color: inherit !important;
+     }
+   </style>
+      `;
+
+      if (/<\/body>/i.test(html)) {
+        html = html.replace(/<\/body>/i, `${stylesToInject}</body>`);
+      } else if (/<\/html>/i.test(html)) {
+        html = html.replace(/<\/html>/i, `${stylesToInject}</html>`);
+      } else {
+        html = `${html}${stylesToInject}`;
+      }
+    }
+
+    return html;
+  };
 
   return (
-    <div className="flex flex-col h-full bg-theme-bg overflow-y-auto" ref={scrollRef}>
-      <header className="flex items-center justify-between p-3 border-b border-theme-border sticky top-0 bg-theme-bg/95 backdrop-blur z-20 shrink-0 shadow-sm">
-        <button onClick={onBack} className="p-2 -ml-1 rounded-full hover:bg-theme-muted transition-colors text-theme-text/80">
-          <ArrowLeft className="w-5 h-5" />
-        </button>
-        <h2 className="font-heading font-semibold text-[15px] truncate flex-1 px-3 text-center text-theme-accent-end tracking-tight">
-          {note.title}
-        </h2>
-        {note.type === 'STATIC_A4' ? (
+    <div className={`flex flex-col h-full bg-theme-bg overflow-y-auto ${isFullscreen ? 'fixed inset-0 z-50 bg-[#fffdf9] dark:bg-[#120206] w-full min-h-screen' : ''}`} ref={scrollRef}>
+      {/* Frame Container for actual note payload */}
+      <div className={isFullscreen ? "w-full min-h-screen relative flex-1" : "w-full flex-1 relative flex-shrink-0"}>
+        {isFullscreen ? (
           <button 
-            onClick={() => {/* Mock print via window in an actual app, here we just prevent default error */ alert('Print triggered! (Simulation only)')}} 
-            className="p-2 -mr-1 rounded-full hover:bg-theme-muted transition-colors text-theme-accent-end dark:text-theme-text" 
-            title="Print to PDF"
+            onClick={() => setIsFullscreen(false)} 
+            className="fixed top-4 right-4 z-50 bg-theme-card text-theme-text p-2 rounded-full shadow-md hover:bg-theme-muted transition-colors w-8 h-8 flex items-center justify-center border border-theme-border"
+            title="Exit Fullscreen"
           >
-            <Printer className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         ) : (
-          <div className="w-9" /> 
+          <div className="absolute top-2 right-2 z-20">
+            <button 
+              onClick={() => setIsFullscreen(true)}
+              className="flex items-center justify-center w-8 h-8 rounded-full bg-theme-card/80 backdrop-blur border border-theme-border text-theme-text/80 shadow-sm hover:text-theme-accent-end transition-colors"
+              title="Fullscreen Mode"
+            >
+              <Maximize2 className="w-4 h-4" />
+            </button>
+          </div>
         )}
-      </header>
 
-      {/* Frame Container for actual note payload */}
-      <div className="w-full relative flex-shrink-0" style={{ height: note.type === 'STATIC_A4' ? '65vh' : '85vh' }}>
-        {note.sourceUrl.startsWith('data:application/pdf') ? (
-          <object data={note.sourceUrl} type="application/pdf" className="w-full h-full border-0 absolute top-0 left-0 z-10 block bg-white">
-            <div className="p-10 text-center w-full mt-20 font-bold opacity-50">Browser unable to inline PDF.<br /><br /> <a href={note.sourceUrl} download={note.title + ".pdf"} className="underline text-theme-accent-end">Download PDF directly</a></div>
-          </object>
-        ) : (
-          <iframe
-            title={note.title}
-            srcDoc={iframeContent}
-            className="w-full h-full border-0 shadow-inner bg-theme-muted/20 absolute top-0 left-0 z-10 block"
-            sandbox="allow-scripts allow-same-origin"
-          />
-        )}
+        <div className={note.type === 'STATIC_A4' ? "max-w-[794px] w-full mx-auto p-0 m-0 relative h-full" : "w-full h-full p-0 m-0 relative"}>
+          {note.sourceUrl.startsWith('data:application/pdf') ? (
+            <object data={note.sourceUrl} type="application/pdf" className="w-full min-h-screen border-none block bg-white">
+              <div className="p-10 text-center w-full mt-20 font-bold opacity-50">Browser unable to inline PDF.<br /><br /> <a href={note.sourceUrl} download={note.title + ".pdf"} className="underline text-theme-accent-end">Download PDF directly</a></div>
+            </object>
+          ) : (
+            <iframe
+              title={note.title}
+              srcDoc={getThemedHtml(note.sourceUrl, !!isDarkMode)}
+              className="w-full min-h-screen border-none block"
+              sandbox="allow-scripts allow-same-origin"
+            />
+          )}
+        </div>
       </div>
 
       {/* Community System (scrollable underneath) */}
-      <div className="p-5 shrink-0 bg-theme-card border-t-4 border-theme-border shadow-[0_-10px_30px_rgba(0,0,0,0.02)] isolate z-10 flex-1">
-        <div className="flex items-center gap-4 mb-6">
+      {!isFullscreen && (
+        <div className="p-5 shrink-0 bg-theme-card border-t border-theme-border shadow-[0_-4px_20px_rgb(0,0,0,0.02)] isolate z-10 w-full mt-auto">
+          <div className="flex items-center gap-4 mb-6">
           <button 
             onClick={handleLike}
             className={`flex items-center gap-2 px-5 py-2.5 rounded-[25px] transition-all cursor-pointer font-semibold shadow-sm ${
@@ -229,6 +240,7 @@ export function NoteView({ note, onBack }: NoteViewProps) {
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }

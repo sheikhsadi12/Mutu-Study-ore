@@ -1,14 +1,26 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Header } from '../components/Header';
 import { NoteView } from './NoteView';
 import { Note } from '../types';
-import { FileText, LayoutGrid, Clock, ChevronRight, Lock } from 'lucide-react';
+import { FileText, LayoutGrid, Clock, ChevronRight, Lock, BookOpen } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 
-export function Home({ notes, onNavigateToAdmin, toggleTheme, isDarkMode, searchQuery, setSearchQuery }: any) {
+export function Home({ onNavigateToAdmin, toggleTheme, isDarkMode, searchQuery, setSearchQuery }: any) {
   const [activeNote, setActiveNote] = useState<Note | null>(null);
   const [filter, setFilter] = useState('All');
+  const [notes, setNotes] = useState<Note[]>([]);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('mutu_local_notes');
+      if (stored) {
+        setNotes(JSON.parse(stored) as Note[]);
+      }
+    } catch(e) {
+      console.warn('Failed to parse local notes', e);
+    }
+  }, []);
 
   const filteredNotes = notes.filter((n: Note) => {
     const matchesCategory = filter === 'All' || n.category === filter;
@@ -18,18 +30,19 @@ export function Home({ notes, onNavigateToAdmin, toggleTheme, isDarkMode, search
     return matchesCategory && searchMatch;
   });
 
+  const categories = ['All', ...Array.from(new Set(notes.map((n: Note) => n.category)))];
+
   // Directory UI component shared for Mobile View and Desktop Left Panel
   const DirectoryView = ({ condensed = false }: { condensed?: boolean }) => (
     <div className={cn("overflow-y-auto h-full flex-1", condensed ? "p-3 md:p-4 space-y-3 bg-theme-muted/20" : "p-4 sm:p-6 lg:p-10 bg-theme-muted/10")}>
       {!condensed && (
         <div className="max-w-5xl mx-auto">
-          <div className="flex flex-col md:flex-row md:items-end justify-between mb-6 md:mb-8 gap-4 border-b border-theme-border/50 pb-4 md:pb-6">
+          <div className="flex flex-col mb-4 md:mb-6 gap-3 border-b border-theme-border/50 pb-4">
             <div>
-              <h2 className="font-heading font-black text-2xl md:text-3xl lg:text-4xl mb-1 text-theme-accent-end">Core Directory</h2>
-              <p className="text-theme-text/60 font-semibold uppercase tracking-widest text-[10px] md:text-xs">Knowledge Base Modules</p>
+              <h2 className="text-theme-text/70 font-bold uppercase tracking-widest text-xs md:text-sm">Knowledge Base Modules</h2>
             </div>
             <div className="flex flex-wrap gap-2">
-              {['All', 'Mathematics', 'Physics', 'Chemistry', 'Biology'].map(f => (
+              {categories.map(f => (
                 <button 
                   key={f}
                   onClick={() => setFilter(f)}
@@ -47,8 +60,14 @@ export function Home({ notes, onNavigateToAdmin, toggleTheme, isDarkMode, search
           </div>
 
           {filteredNotes.length === 0 && (
-             <div className="text-center py-12 opacity-50">
-                <p className="font-bold text-sm uppercase tracking-wider">No materials found.</p>
+             <div className="flex flex-col items-center justify-center py-24 px-6 text-center">
+               <div className="w-20 h-20 mb-6 rounded-full bg-theme-muted flex items-center justify-center shadow-inner border border-theme-border/50 text-theme-accent-end/60">
+                 <BookOpen className="w-10 h-10" />
+               </div>
+               <h3 className="font-heading font-black text-xl text-theme-accent-end mb-2">No Modules Found</h3>
+               <p className="text-sm font-semibold opacity-70 max-w-sm mx-auto leading-relaxed text-theme-text/80">
+                 No modules found. Please upload new study materials from the Admin Panel.
+               </p>
              </div>
           )}
 
@@ -129,82 +148,23 @@ export function Home({ notes, onNavigateToAdmin, toggleTheme, isDarkMode, search
 
   return (
     <div className="flex flex-col h-screen bg-theme-bg overflow-hidden relative">
-      <Header onNavigateToAdmin={onNavigateToAdmin} toggleTheme={toggleTheme} isDarkMode={isDarkMode} searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
+      <Header 
+        onNavigateToAdmin={onNavigateToAdmin} 
+        toggleTheme={toggleTheme} 
+        isDarkMode={isDarkMode} 
+        searchQuery={searchQuery} 
+        setSearchQuery={setSearchQuery}
+        activeNote={activeNote}
+        onBack={() => setActiveNote(null)}
+      />
       
-      {/* MOBILE EXACT ARCHITECTURE */}
-      <div className="md:hidden flex flex-col h-[calc(100vh-52px)] w-full">
+      {/* UNIFIED EXACT ARCHITECTURE */}
+      <div className="flex flex-col h-[calc(100vh-48px)] w-full relative">
         {!activeNote ? (
           <DirectoryView condensed={false} />
         ) : (
-          <NoteView note={activeNote} onBack={() => setActiveNote(null)} />
+          <NoteView note={activeNote} onBack={() => setActiveNote(null)} isDarkMode={isDarkMode} />
         )}
-      </div>
-
-      {/* DESKTOP EXACT ARCHITECTURE */}
-      <div className="hidden md:flex h-[calc(100vh-52px)] w-full relative">
-        {/* Left Side: Web Portal */}
-        <div className="flex-1 lg:flex-none lg:w-[640px] xl:w-[60%] flex flex-col border-r border-theme-border relative overflow-hidden bg-theme-bg">
-          <DirectoryView />
-        </div>
-
-        {/* Right Side: Mobile Simulator Mockup */}
-        <div className="flex-1 bg-[#120206] flex items-center justify-center p-8 relative shrink-0">
-          <div className="absolute bottom-8 right-8 text-[#f5ebe6] text-[10px] font-mono tracking-tighter opacity-40">
-            MOBILE_SIMULATOR_V1 // SHARED_STATE_SYNC: TRUE
-          </div>
-          
-          <div className="w-full max-w-[300px] flex flex-col relative z-10 self-center">
-            <div className="text-center mb-6 w-full flex justify-between items-end px-2">
-              <div className="text-left">
-                <h3 className="font-heading font-black text-xl tracking-tight text-white/90 uppercase">Simulator</h3>
-                <p className="text-[10px] font-bold tracking-widest text-[#7C2D12] uppercase flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span> Live PWA
-                </p>
-              </div>
-              {activeNote && (
-                 <button 
-                   onClick={() => setActiveNote(null)} 
-                   className="text-xs uppercase font-bold tracking-widest text-white/50 hover:text-white transition-colors"
-                 >
-                   Close PWA
-                 </button>
-              )}
-            </div>
-
-            {/* Smartphone Enclosure */}
-            <div className="relative w-full h-[620px] bg-[#120206] border-[8px] border-theme-accent-start rounded-[48px] shadow-2xl flex flex-col overflow-hidden shrink-0">
-               <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-6 bg-[#120206] rounded-b-2xl z-20" />
-
-               {/* Screen Content Wrapper */}
-               <div className="flex-1 bg-theme-bg rounded-[40px] overflow-hidden relative flex flex-col isolate">
-                <div className="h-7 w-full bg-theme-bg shrink-0 flex items-center justify-between px-6 z-40 sticky top-0 border-b border-theme-border/10">
-                   <span className="text-[10px] font-semibold tracking-wider text-theme-text">9:41</span>
-                   <div className="flex items-center gap-1.5 opacity-80">
-                     <div className="w-3 h-2.5 border border-theme-text rounded-[2px]" />
-                     <div className="w-4 h-2.5 bg-theme-text/20 rounded-[2px] relative"><div className="absolute top-0.5 left-0.5 bottom-0.5 right-1 bg-theme-text rounded-sm" /></div>
-                   </div>
-                </div>
-
-                {!activeNote ? (
-                  <div className="flex-1 flex flex-col overflow-hidden bg-theme-bg">
-                    <div className="px-5 pt-8 pb-3 bg-theme-bg border-b border-theme-border shrink-0 flex items-center justify-between shadow-sm z-10">
-                       <h1 className="font-heading font-black text-lg bg-gradient-to-r from-theme-accent-start to-theme-accent-end bg-clip-text text-transparent transform scale-y-110">MUTU STUDY</h1>
-                       <div className="w-7 h-7 rounded-full bg-gradient-to-br from-theme-accent-start to-theme-accent-end text-white flex items-center justify-center text-[10px] font-bold shadow-md ring-2 ring-theme-bg">SS</div>
-                    </div>
-                    <DirectoryView condensed={true} />
-                  </div>
-                ) : (
-                  <div className="flex-1 flex flex-col max-h-full overflow-hidden isolate relative">
-                     <NoteView note={activeNote} onBack={() => setActiveNote(null)} />
-                  </div>
-                )}
-             </div>
-
-             {/* Home Indicator bar */}
-             <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-32 h-1.5 bg-white/20 rounded-full z-50" />
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   );
