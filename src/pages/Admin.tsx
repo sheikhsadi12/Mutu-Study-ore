@@ -2,14 +2,21 @@ import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Upload, Lock, Code, List, MessageSquare, Edit, Trash2, BookOpen } from 'lucide-react';
 import { Note, Comment } from '../types';
 import { supabase } from '../supabaseClient';
+import { useNavigate } from 'react-router-dom';
 
 interface AdminProps {
-  onBack: () => void;
+  onBack?: () => void;
 }
 
 export function Admin({ onBack }: AdminProps) {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [password, setPassword] = useState('');
+  const navigate = useNavigate();
+
+  const handleBack = () => {
+    if (onBack) onBack();
+    else navigate('/');
+  };
+
+  const [isAuthenticated, setIsAuthenticated] = useState(true); // Always true via private route
   
   const [activeTab, setActiveTab] = useState<'upload' | 'manage' | 'moderate'>('upload');
 
@@ -166,7 +173,7 @@ export function Admin({ onBack }: AdminProps) {
   if (!isAuthenticated) {
     return (
       <div className="flex flex-col items-center justify-center h-screen bg-theme-bg relative">
-        <button onClick={onBack} className="absolute top-6 left-6 p-2 rounded-full hover:bg-theme-muted transition-colors text-theme-text/80">
+        <button onClick={handleBack} className="absolute top-6 left-6 p-2 rounded-full hover:bg-theme-muted transition-colors text-theme-text/80">
           <ArrowLeft className="w-5 h-5" />
         </button>
         <div className="card-base p-8 w-[90%] max-w-sm">
@@ -197,7 +204,7 @@ export function Admin({ onBack }: AdminProps) {
     <div className="flex flex-col h-screen bg-theme-bg overflow-y-auto w-full">
       <header className="py-2.5 md:py-4 px-4 md:px-6 border-b border-theme-border flex flex-col md:flex-row md:items-center justify-between gap-3 bg-theme-bg shrink-0 sticky top-0 z-20 shadow-sm w-full">
         <div className="flex items-center gap-3">
-            <button onClick={onBack} className="p-2 -ml-2 rounded-full hover:bg-theme-muted transition-colors text-theme-text/80">
+            <button onClick={handleBack} className="p-2 -ml-2 rounded-full hover:bg-theme-muted transition-colors text-theme-text/80">
             <ArrowLeft className="w-4 h-4 md:w-5 md:h-5" />
             </button>
             <div>

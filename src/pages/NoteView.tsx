@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Heart, Send, MessageCircle, Maximize2, X } from 'lucide-react';
+import { Heart, Send, MessageCircle, Maximize2, X, Sparkles, Loader2, Bot } from 'lucide-react';
 import { Note, Comment, LikeState } from '../types';
 import { supabase } from '../supabaseClient';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 interface NoteViewProps {
   note: Note;
@@ -11,6 +12,44 @@ interface NoteViewProps {
 
 export function NoteView({ note, onBack, isDarkMode = false }: NoteViewProps) {
   const [fullNote, setFullNote] = useState<Note | null>(null);
+  
+  // AI State
+  const [aiPanelOpen, setAiPanelOpen] = useState(false);
+  const [aiQuery, setAiQuery] = useState('');
+  const [aiResponse, setAiResponse] = useState('');
+  const [isAiLoading, setIsAiLoading] = useState(false);
+  
+  const handleAiSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!aiQuery.trim()) return;
+
+    const apiKey = localStorage.getItem('mutu_user_gemini_key');
+    if (!apiKey) {
+      setAiResponse('Error: Please configure your Gemini API Key in the profile menu.');
+      return;
+    }
+
+    setIsAiLoading(true);
+    setAiResponse('');
+
+    try {
+      const genAI = new GoogleGenerativeAI(apiKey);
+      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+      const prompt = `Context: This is a study module titled "${note.title}".
+      The HTML content of the module is:
+      ${fullNote?.html_code?.substring(0, 50000)}
+
+      Question: ${aiQuery}`;
+      
+      const result = await model.generateContent(prompt);
+      setAiResponse(result.response.text());
+    } catch (e: any) {
+      console.error(e);
+      setAiResponse('AI Error: ' + (e?.message || 'Failed to fetch response.'));
+    } finally {
+      setIsAiLoading(false);
+    }
+  };
 
   useEffect(() => {
     const fetchNote = async () => {
@@ -200,6 +239,68 @@ export function NoteView({ note, onBack, isDarkMode = false }: NoteViewProps) {
         </div>
       </div>
       )}
+      
+      {/* Mutu AI Floating Widget */}
+      <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end">
+        {aiPanelOpen && (
+          <div className="w-80 h-96 mb-4 bg-theme-bg border border-theme-border rounded-xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-4">
+            <div className="bg-gradient-to-r from-theme-accent-start to-theme-accent-end p-3 flex justify-between items-center text-white">
+              <div className="flex items-center gap-2 font-bold text-sm">
+                <Sparkles className="w-4 h-4" /> Mutu AI
+              </div>
+              <button onClick={() => setAiPanelOpen(false)} className="hover:opacity-80">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            
+            <div className="flex-1 p-4 overflow-y-auto w-full text-xs text-theme-text/80 space-y-4">
+              {aiResponse ? (
+                <div className="leading-relaxed whitespace-pre-wrap">{aiResponse}</div>
+              ) : (
+                <div className="opacity-50 text-center h-full flex items-center justify-center italic">
+                  Ask me anything about this module!
+                </div>
+              )}
+              {isAiLoading && (
+                <div className="flex items-center gap-2 text-theme-accent-end">
+                  <Loader2 className="w-4 h-4 animate-spin" /> Thinking...
+                </div>
+              )}
+            </div>
+
+            <form onSubmit={handleAiSubmit} className="p-3 border-t border-theme-border bg-theme-muted/20 flex gap-2">
+              <input
+                type="text"
+                placeholder="Ask about this context..."
+                value={aiQuery}
+                onChange={(e) => setAiQuery(e.target.value)}
+                disabled={isAiLoading}
+                className="flex-1 bg-theme-bg border border-theme-border rounded-md px-3 text-xs outline-none focus:border-theme-accent-end py-2 placeholder:text-theme-text/40"
+              />
+              <button 
+                type="submit" 
+                disabled={isAiLoading || !aiQuery.trim()}
+                className="bg-theme-accent-end text-white px-3 py-2 rounded-md disabled:opacity-50 hover:opacity-90"
+              >
+                <Send className="w-3.5 h-3.5" />
+              </button>
+            </form>
+          </div>
+        )}
+        
+        <button 
+          onClick={() => setAiPanelOpen(!aiPanelOpen)}
+          className={`w-12 h-12 rounded-full shadow-lg flex items-center justify-center transition-all ${
+            aiPanelOpen 
+              ? 'bg-theme-card text-theme-accent-end border border-theme-border' 
+              : 'bg-gradient-to-r from-theme-accent-start to-theme-accent-end text-white hover:scale-105'
+          }`}
+          title="Mutu AI Assistance"
+        >
+          {aiPanelOpen ? <X className="w-5 h-5" /> : <Bot className="w-6 h-6" />}
+        </button>
+      </div>
+      
     </div>
   );
 }

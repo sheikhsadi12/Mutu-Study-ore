@@ -4,11 +4,14 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Home } from './pages/Home';
 import { Admin } from './pages/Admin';
+import { Login } from './pages/Login';
+import { PrivateRoute } from './components/PrivateRoute';
+import { supabase } from './supabaseClient';
 
 export default function App() {
-  const [currentView, setCurrentView] = useState<'home' | 'admin'>('home');
   const [searchQuery, setSearchQuery] = useState('');
   
   const [isDarkMode, setIsDarkMode] = useState(() => {
@@ -40,20 +43,31 @@ export default function App() {
   };
 
   return (
-    <>
-      {currentView === 'home' ? (
-        <Home 
-           onNavigateToAdmin={() => setCurrentView('admin')} 
-           toggleTheme={toggleTheme} 
-           isDarkMode={isDarkMode}
-           searchQuery={searchQuery}
-           setSearchQuery={setSearchQuery}
+    <BrowserRouter>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route 
+          path="/" 
+          element={
+            <PrivateRoute>
+              <Home 
+                toggleTheme={toggleTheme} 
+                isDarkMode={isDarkMode}
+                searchQuery={searchQuery}
+                setSearchQuery={setSearchQuery}
+              />
+            </PrivateRoute>
+          } 
         />
-      ) : (
-        <Admin 
-           onBack={() => setCurrentView('home')} 
+        <Route 
+          path="/admin" 
+          element={
+            <PrivateRoute adminOnly={true}>
+              <Admin />
+            </PrivateRoute>
+          } 
         />
-      )}
-    </>
+      </Routes>
+    </BrowserRouter>
   );
 }

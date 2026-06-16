@@ -1,10 +1,13 @@
-import React, { useState } from 'react';
-import { User, CheckCircle2, Settings, LogOut, Search, Moon, Sun, MonitorSmartphone, ArrowLeft, FileText, Printer } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { User, CheckCircle2, Settings, LogOut, Search, Moon, Sun, MonitorSmartphone, ArrowLeft, FileText, Printer, Key } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Note } from '../types';
+import { supabase } from '../supabaseClient';
+import { useNavigate } from 'react-router-dom';
+import { ADMIN_EMAIL } from './PrivateRoute';
+import { User as AuthUser } from '@supabase/supabase-js';
 
 interface HeaderProps {
-  onNavigateToAdmin: () => void;
   toggleTheme: () => void;
   isDarkMode: boolean;
   searchQuery: string;
@@ -13,9 +16,35 @@ interface HeaderProps {
   onBack?: () => void;
 }
 
-export function Header({ onNavigateToAdmin, toggleTheme, isDarkMode, searchQuery, setSearchQuery, activeNote, onBack }: HeaderProps) {
+export function Header({ toggleTheme, isDarkMode, searchQuery, setSearchQuery, activeNote, onBack }: HeaderProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [geminiKey, setGeminiKey] = useState('');
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    // Get current session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+    });
+
+    const savedKey = localStorage.getItem('mutu_user_gemini_key');
+    if (savedKey) {
+      setGeminiKey(savedKey);
+    }
+  }, []);
+
+  const handleSaveGeminiKey = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setGeminiKey(val);
+    localStorage.setItem('mutu_user_gemini_key', val);
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    navigate('/login');
+  };
 
   return (
     <header className="h-[48px] px-2 md:px-4 flex items-center justify-between border-b border-theme-border bg-theme-bg shrink-0 z-50 relative w-full">
@@ -29,7 +58,7 @@ export function Header({ onNavigateToAdmin, toggleTheme, isDarkMode, searchQuery
         {!searchOpen && (
           <div className="flex items-center gap-2 min-w-0">
             {!activeNote && <div className="w-6 h-6 bg-gradient-to-br from-theme-accent-start to-theme-accent-end rounded-[6px] flex items-center justify-center text-white font-bold text-xs shrink-0 hidden sm:flex">M</div>}
-            <h1 className="text-sm md:text-lg tracking-tight font-heading font-black text-theme-accent-start truncate shrink-0">
+            <h1 className="text-sm md:text-lg tracking-tight font-heading font-black text-theme-accent-start truncate shrink-0 cursor-pointer" onClick={() => navigate('/')}>
               MUTU STUDY
             </h1>
             {activeNote && (
@@ -46,23 +75,25 @@ export function Header({ onNavigateToAdmin, toggleTheme, isDarkMode, searchQuery
 
       <div className="flex items-center gap-1 sm:gap-2 shrink-0">
         {/* Toggle Search Bar on Mobile */}
-        <div className={cn("relative group flex items-center transition-all", searchOpen ? "w-48 sm:w-64" : "w-auto")}>
-          <Search 
-            onClick={() => setSearchOpen(!searchOpen)}
-            className="w-4 h-4 text-theme-text/80 sm:hidden cursor-pointer p-0.5 hover:bg-theme-muted rounded-full" 
-          />
-          <Search className={cn("w-3.5 h-3.5 text-theme-text/50 absolute left-2.5 hidden sm:block", searchOpen && 'block')} />
-          <input 
-            type="text" 
-            placeholder="Search..." 
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className={cn(
-              "py-1.5 bg-theme-muted/50 border border-theme-border/50 rounded-full text-xs focus:outline-none focus:border-theme-accent-end focus:ring-1 focus:ring-theme-accent-end transition-all",
-              searchOpen ? "pl-8 pr-3 w-full block" : "hidden sm:block pl-8 pr-3 w-32 md:w-48 xl:w-64"
-            )}
-          />
-        </div>
+        {!activeNote && (
+          <div className={cn("relative group flex items-center transition-all", searchOpen ? "w-48 sm:w-64" : "w-auto")}>
+            <Search 
+              onClick={() => setSearchOpen(!searchOpen)}
+              className="w-4 h-4 text-theme-text/80 sm:hidden cursor-pointer p-0.5 hover:bg-theme-muted rounded-full" 
+            />
+            <Search className={cn("w-3.5 h-3.5 text-theme-text/50 absolute left-2.5 hidden sm:block", searchOpen && 'block')} />
+            <input 
+              type="text" 
+              placeholder="Search..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className={cn(
+                "py-1.5 bg-theme-muted/50 border border-theme-border/50 rounded-full text-xs focus:outline-none focus:border-theme-accent-end focus:ring-1 focus:ring-theme-accent-end transition-all",
+                searchOpen ? "pl-8 pr-3 w-full block" : "hidden sm:block pl-8 pr-3 w-32 md:w-48 xl:w-64"
+              )}
+            />
+          </div>
+        )}
 
         {activeNote && activeNote.type === 'STATIC_A4' && (
            <button 
@@ -86,24 +117,46 @@ export function Header({ onNavigateToAdmin, toggleTheme, isDarkMode, searchQuery
             onClick={() => setDropdownOpen(!dropdownOpen)}
             className="flex items-center justify-center w-6 h-6 sm:w-8 sm:h-8 overflow-hidden p-0 rounded-full border-2 border-theme-accent-start bg-theme-border hover:border-theme-accent-end transition-colors cursor-pointer shrink-0"
           >
-            <div className="w-full h-full flex items-center justify-center bg-theme-accent-start text-white text-[10px] sm:text-xs font-bold">
-              SS
-            </div>
+            {user?.user_metadata?.avatar_url ? (
+              <img src={user.user_metadata.avatar_url} alt="Profile" className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center bg-theme-accent-start text-white text-[10px] sm:text-xs font-bold">
+                {user?.email?.charAt(0).toUpperCase() || 'U'}
+              </div>
+            )}
           </button>
 
           {dropdownOpen && (
-            <div className="absolute top-full right-0 mt-2 w-48 sm:w-56 card-base shadow-xl z-50">
-              <div className="card-top-accent" />
-              <div className="p-3 sm:p-4 border-b border-theme-border/30">
+            <div className="absolute top-full right-0 mt-2 w-64 card-base shadow-xl z-50 p-2 border border-theme-border/50 bg-theme-bg">
+              <div className="p-3 border-b border-theme-border/30">
                 <div className="flex items-center gap-2 mb-1">
-                  <p className="font-semibold font-heading text-sm sm:text-base truncate">Sheikh Sadi</p>
-                  <CheckCircle2 className="w-3 H-3 sm:w-4 sm:h-4 text-theme-accent-end shrink-0" />
+                  <p className="font-semibold font-heading text-sm truncate">{user?.user_metadata?.full_name || user?.email}</p>
+                  {user?.email === ADMIN_EMAIL && <CheckCircle2 className="w-3.5 h-3.5 text-theme-accent-end shrink-0" />}
                 </div>
-                <p className="text-[10px] text-theme-text/60">Administrator</p>
+                <p className="text-[10px] text-theme-text/60">{user?.email}</p>
               </div>
-              <div className="p-1.5 sm:p-2">
-                <button onClick={() => { setDropdownOpen(false); onNavigateToAdmin(); }} className="flex items-center gap-2.5 sm:gap-3 px-2 sm:px-3 py-1.5 sm:py-2 rounded-md hover:bg-theme-muted text-xs sm:text-sm transition-colors text-left w-full text-theme-text/80">
-                  <MonitorSmartphone className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Admin Portal
+              
+              <div className="p-3 border-b border-theme-border/30">
+                <label className="text-[10px] uppercase font-bold text-theme-text/70 flex items-center gap-1 mb-2">
+                  <Key className="w-3 h-3" /> Gemini API Key
+                </label>
+                <input 
+                  type="password" 
+                  placeholder="AI Key (Saved Locally)" 
+                  value={geminiKey}
+                  onChange={handleSaveGeminiKey}
+                  className="w-full py-1.5 px-3 bg-theme-muted/50 border border-theme-border/50 rounded-md text-xs focus:outline-none focus:border-theme-accent-end focus:ring-1 focus:ring-theme-accent-end transition-all text-theme-text"
+                />
+              </div>
+
+              <div className="p-1.5">
+                {user?.email === ADMIN_EMAIL && (
+                  <button onClick={() => { setDropdownOpen(false); navigate('/admin'); }} className="flex items-center gap-2.5 px-2 py-2 mb-1 rounded-md hover:bg-theme-muted text-xs sm:text-sm transition-colors text-left w-full text-theme-text/80 font-medium">
+                    <MonitorSmartphone className="w-4 h-4" /> Admin Portal
+                  </button>
+                )}
+                <button onClick={handleLogout} className="flex items-center gap-2.5 px-2 py-2 rounded-md hover:bg-rose-500/10 hover:text-rose-500 text-xs sm:text-sm transition-colors text-left w-full text-theme-text/80 font-medium">
+                  <LogOut className="w-4 h-4" /> Sign Out
                 </button>
               </div>
             </div>

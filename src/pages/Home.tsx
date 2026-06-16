@@ -7,7 +7,7 @@ import { cn } from '../lib/utils';
 import { supabase } from '../supabaseClient';
 
 
-export function Home({ onNavigateToAdmin, toggleTheme, isDarkMode, searchQuery, setSearchQuery }: any) {
+export function Home({ toggleTheme, isDarkMode, searchQuery, setSearchQuery }: any) {
   const [activeNote, setActiveNote] = useState<Note | null>(null);
   const [filter, setFilter] = useState('All');
   const [notes, setNotes] = useState<Note[]>([]);
@@ -194,7 +194,6 @@ export function Home({ onNavigateToAdmin, toggleTheme, isDarkMode, searchQuery, 
   return (
     <div className="flex flex-col h-screen bg-theme-bg overflow-hidden relative">
       <Header 
-        onNavigateToAdmin={onNavigateToAdmin} 
         toggleTheme={toggleTheme} 
         isDarkMode={isDarkMode} 
         searchQuery={searchQuery} 
