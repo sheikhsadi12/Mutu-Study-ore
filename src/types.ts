@@ -5,7 +5,7 @@ export interface Note {
   title: string;
   description: string;
   type: NoteType;
-  category: string;
+  subject: string;
   chapter?: string;
   html_code: string;
   created_at: string;

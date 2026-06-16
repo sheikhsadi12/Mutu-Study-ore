@@ -25,14 +25,14 @@ export function Home({ onNavigateToAdmin, toggleTheme, isDarkMode, searchQuery, 
   }, []);
 
   const filteredNotes = notes.filter((n: Note) => {
-    const matchesCategory = filter === 'All' || n.category === filter;
+    const matchesSubject = filter === 'All' || n.subject === filter;
     const searchMatch = searchQuery === '' || 
       n.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
       n.description.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesCategory && searchMatch;
+    return matchesSubject && searchMatch;
   });
 
-  const categories = ['All', ...Array.from(new Set(notes.map((n: Note) => n.category)))];
+  const subjects = ['All', ...Array.from(new Set(notes.map((n: Note) => n.subject)))];
 
   // Directory UI component shared for Mobile View and Desktop Left Panel
   const DirectoryView = ({ condensed = false }: { condensed?: boolean }) => (
@@ -44,7 +44,7 @@ export function Home({ onNavigateToAdmin, toggleTheme, isDarkMode, searchQuery, 
               <h2 className="text-theme-text/70 font-bold uppercase tracking-widest text-xs md:text-sm">Knowledge Base Modules</h2>
             </div>
             <div className="flex flex-wrap gap-2">
-              {categories.map(f => (
+              {subjects.map(f => (
                 <button 
                   key={f}
                   onClick={() => setFilter(f)}
@@ -91,7 +91,7 @@ export function Home({ onNavigateToAdmin, toggleTheme, isDarkMode, searchQuery, 
                     </div>
                     <div className="flex flex-col items-end gap-1">
                       <span className="text-[8px] md:text-[9px] font-black tracking-widest uppercase bg-theme-border/20 px-2 md:px-3 py-1 md:py-1.5 rounded-full text-theme-accent-end">
-                        {note.category}
+                        {note.subject}
                       </span>
                       {note.chapter && <span className="text-[8px] font-bold opacity-60 uppercase">{note.chapter}</span>}
                     </div>
@@ -132,7 +132,7 @@ export function Home({ onNavigateToAdmin, toggleTheme, isDarkMode, searchQuery, 
               <div className="flex-1 min-w-0 pr-2">
                 <h4 className="font-semibold text-xs md:text-sm truncate group-hover:text-theme-accent-end transition-colors">{note.title}</h4>
                 <p className="text-[9px] md:text-[10px] uppercase font-bold tracking-wider text-theme-text/50 truncate flex items-center gap-1">
-                  {note.category} <span className="w-1 h-1 rounded-full bg-theme-border"></span> {note.type === 'STATIC_A4' ? 'DOC' : 'APP'}
+                  {note.subject} <span className="w-1 h-1 rounded-full bg-theme-border"></span> {note.type === 'STATIC_A4' ? 'DOC' : 'APP'}
                 </p>
               </div>
               <ChevronRight className="w-3.5 h-3.5 md:w-4 md:h-4 text-theme-text/30 group-hover:text-theme-accent-end" />

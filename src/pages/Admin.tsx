@@ -16,10 +16,10 @@ export function Admin({ onBack }: AdminProps) {
   // Form State
   const [editNoteId, setEditNoteId] = useState<string | null>(null);
   const [title, setTitle] = useState('');
-  const [category, setCategory] = useState('');
+  const [subject, setSubject] = useState('');
   const [type, setType] = useState<'STATIC_A4' | 'DYNAMIC_APPLET'>('STATIC_A4');
   const [description, setDescription] = useState('');
-  const [rawHtml, setRawHtml] = useState('');
+  const [rawHtmlText, setRawHtmlText] = useState('');
 
   // Data State
   const [localNotes, setLocalNotes] = useState<Note[]>([]);
@@ -74,17 +74,17 @@ export function Admin({ onBack }: AdminProps) {
 
   const handleUploadSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title || !rawHtml || !category) {
-      alert("Title, Category and Raw HTML are required.");
+    if (!title || !rawHtmlText || !subject) {
+      alert("Title, Subject and Raw HTML are required.");
       return;
     }
 
     const payload = {
-      title,
-      description,
-      type,
-      category,
-      html_code: rawHtml
+      subject: subject,
+      title: title,
+      type: type,
+      description: description,
+      html_code: rawHtmlText
     };
 
     try {
@@ -109,8 +109,8 @@ export function Admin({ onBack }: AdminProps) {
       setEditNoteId(null);
       setTitle('');
       setDescription('');
-      setCategory('');
-      setRawHtml('');
+      setSubject('');
+      setRawHtmlText('');
       setActiveTab('manage');
     } catch (error) {
       console.warn("Storage exception:", error);
@@ -121,10 +121,10 @@ export function Admin({ onBack }: AdminProps) {
   const handleEditNote = (note: Note) => {
     setEditNoteId(note.id);
     setTitle(note.title);
-    setCategory(note.category);
+    setSubject(note.subject);
     setType(note.type);
     setDescription(note.description);
-    setRawHtml(note.html_code);
+    setRawHtmlText(note.html_code);
     setActiveTab('upload');
   };
 
@@ -247,7 +247,7 @@ export function Admin({ onBack }: AdminProps) {
                         setEditNoteId(null);
                         setTitle('');
                         setDescription('');
-                        setRawHtml('');
+                        setRawHtmlText('');
                     }} className="ml-auto text-[10px] uppercase font-bold text-theme-text/50 hover:text-theme-accent-end">
                         Cancel Edit
                     </button>
@@ -262,7 +262,7 @@ export function Admin({ onBack }: AdminProps) {
                     </div>
                     <div className="flex flex-col gap-1.5">
                     <label className="text-[10px] md:text-xs font-bold text-theme-text/70 uppercase">Subject *</label>
-                    <input required type="text" value={category} onChange={(e) => setCategory(e.target.value)} placeholder="e.g. Physics, Mathematics, History..." className="px-3 py-2 bg-theme-bg border border-theme-border rounded-md text-xs md:text-sm focus:border-theme-accent-end outline-none shadow-sm" />
+                    <input required type="text" value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="e.g. Physics, Mathematics, History..." className="px-3 py-2 bg-theme-bg border border-theme-border rounded-md text-xs md:text-sm focus:border-theme-accent-end outline-none shadow-sm" />
                     </div>
                 </div>
 
@@ -281,7 +281,7 @@ export function Admin({ onBack }: AdminProps) {
 
                 <div className="flex flex-col gap-1.5 mt-2">
                     <label className="text-[10px] md:text-xs font-bold text-theme-text/70 uppercase flex items-center gap-1"><Code className="w-3 h-3"/> Raw HTML Content *</label>
-                    <textarea required rows={8} value={rawHtml} onChange={(e) => setRawHtml(e.target.value)} placeholder="<div><h1>Heading</h1><p>Notes here...</p></div>" className="px-3 py-3 font-mono bg-[#1e1e1e] border border-theme-border rounded-md text-xs text-white focus:border-theme-accent-end outline-none shadow-inner" />
+                    <textarea required rows={8} value={rawHtmlText} onChange={(e) => setRawHtmlText(e.target.value)} placeholder="<div><h1>Heading</h1><p>Notes here...</p></div>" className="px-3 py-3 font-mono bg-[#1e1e1e] border border-theme-border rounded-md text-xs text-white focus:border-theme-accent-end outline-none shadow-inner" />
                 </div>
 
                 <button type="submit" className="bg-gradient-to-r from-theme-accent-start to-theme-accent-end text-white rounded-[25px] px-6 py-2.5 font-medium transition-all hover:opacity-90 shadow-md mt-4 w-full">
@@ -317,7 +317,7 @@ export function Admin({ onBack }: AdminProps) {
                                       <h3 className="font-bold text-sm md:text-base text-theme-text truncate">{note.title}</h3>
                                       <div className="flex items-center gap-2 mt-1">
                                           <span className="text-[9px] font-black tracking-widest uppercase bg-theme-border/30 px-2 py-0.5 rounded-full text-theme-accent-end">
-                                              {note.category}
+                                              {note.subject}
                                           </span>
                                           <span className="text-[10px] text-theme-text/60 font-semibold">{note.type === 'STATIC_A4' ? 'Static Doc' : 'Applet'}</span>
                                       </div>
