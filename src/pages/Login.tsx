@@ -45,9 +45,15 @@ export function Login() {
     
     try {
       if (isSignUp) {
-        const { error } = await supabase.auth.signUp({ email, password });
+        const { error, data } = await supabase.auth.signUp({ email, password });
         if (error) throw error;
-        alert('Account created! Please check your email for a confirmation link (if enabled in Supabase), or sign in directly.');
+        
+        if (data?.user?.identities?.length === 0) {
+           alert('This email is already registered. Please sign in instead.');
+        } else {
+           alert('Account created!\n\nIf you cannot log in, please ensure "Confirm email" is DISABLED in your Supabase Dashboard -> Authentication -> Providers -> Email setting. (Emails often fail to send on the free tier).');
+           setIsSignUp(false); // Switch to sign in mode automatically
+        }
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
