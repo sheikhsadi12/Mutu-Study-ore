@@ -17,6 +17,7 @@ export function Admin({ onBack }: AdminProps) {
   };
 
   const [isAuthenticated, setIsAuthenticated] = useState(true); // Always true via private route
+  const [password, setPassword] = useState('');
   
   const [activeTab, setActiveTab] = useState<'upload' | 'manage' | 'moderate' | 'users'>('upload');
 
@@ -27,6 +28,7 @@ export function Admin({ onBack }: AdminProps) {
   const [type, setType] = useState<'STATIC_A4' | 'DYNAMIC_APPLET'>('STATIC_A4');
   const [description, setDescription] = useState('');
   const [rawHtmlText, setRawHtmlText] = useState('');
+  const [pdfLink, setPdfLink] = useState('');
 
   // Data State
   const [localNotes, setLocalNotes] = useState<Note[]>([]);
@@ -86,27 +88,43 @@ export function Admin({ onBack }: AdminProps) {
       return;
     }
 
-    const payload = {
-      subject: subject,
-      title: title,
-      type: type,
-      description: description,
-      html_code: rawHtmlText
-    };
-
     try {
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      const userId = userData?.user?.id;
+
+      if (!userId) {
+        alert("Authentication error: Could not identify current user. Please log in again.");
+        return;
+      }
+
+      const payload = {
+        subject: subject,
+        title: title,
+        type: type,
+        description: description,
+        html_code: rawHtmlText,
+        pdf_link: pdfLink,
+      };
+
       if (editNoteId) {
         const { error } = await supabase.from('notes').update(payload).eq('id', editNoteId);
-        if (error) throw error;
+        if (error) {
+           console.error("Storage exception updating note:", error);
+           throw new Error(error.message || "Failed to update material. Check database RLS policies.");
+        }
         alert("Material successfully updated!");
       } else {
         const payloadWithId = {
            id: crypto.randomUUID(),
            ...payload,
+           user_id: userId,
            created_at: new Date().toISOString()
         };
         const { error } = await supabase.from('notes').insert([payloadWithId]);
-        if (error) throw error;
+        if (error) {
+           console.error("Storage exception inserting note:", error);
+           throw new Error(error.message || "Failed to insert material. Ensure user_id meets RLS policies.");
+        }
         alert("Material successfully published!");
       }
       
@@ -118,10 +136,11 @@ export function Admin({ onBack }: AdminProps) {
       setDescription('');
       setSubject('');
       setRawHtmlText('');
+      setPdfLink('');
       setActiveTab('manage');
-    } catch (error) {
-      console.warn("Storage exception:", error);
-      alert("Error saving material to Supabase");
+    } catch (error: any) {
+      console.warn("Storage exception handling:", error);
+      alert("Error saving material to Supabase: " + (error.message || 'Unknown error.'));
     }
   };
 
@@ -132,6 +151,7 @@ export function Admin({ onBack }: AdminProps) {
     setType(note.type);
     setDescription(note.description);
     setRawHtmlText(note.html_code);
+    setPdfLink(note.pdf_link || '');
     setActiveTab('upload');
   };
 
@@ -294,8 +314,13 @@ export function Admin({ onBack }: AdminProps) {
                 </div>
 
                 <div className="flex flex-col gap-1.5 mt-2">
-                    <label className="text-[10px] md:text-xs font-bold text-theme-text/70 uppercase flex items-center gap-1"><Code className="w-3 h-3"/> Raw HTML Content *</label>
-                    <textarea required rows={8} value={rawHtmlText} onChange={(e) => setRawHtmlText(e.target.value)} placeholder="<div><h1>Heading</h1><p>Notes here...</p></div>" className="px-3 py-3 font-mono bg-[#1e1e1e] border border-theme-border rounded-md text-xs text-white focus:border-theme-accent-end outline-none shadow-inner" />
+                    <label className="text-[10px] md:text-xs font-bold text-theme-text/70 uppercase">PDF or Resource Link (Optional)</label>
+                    <input type="url" value={pdfLink} onChange={(e) => setPdfLink(e.target.value)} placeholder="e.g. Google Drive, Dropbox, or any web link..."  className="px-3 py-2 bg-theme-bg border border-theme-border rounded-md text-xs md:text-sm focus:border-theme-accent-end outline-none shadow-sm" />
+                </div>
+
+                <div className="flex flex-col gap-1.5 mt-2">
+                    <label className="text-[10px] md:text-xs font-bold text-theme-text/70 uppercase flex items-center gap-1"><Code className="w-3 h-3"/> Content (Markdown or HTML) *</label>
+                    <textarea required rows={12} value={rawHtmlText} onChange={(e) => setRawHtmlText(e.target.value)} placeholder="# Heading\n\nWrite your Markdown content here..." className="px-3 py-3 font-mono bg-[#1e1e1e] border border-theme-border rounded-md text-xs text-white focus:border-theme-accent-end outline-none shadow-inner" />
                 </div>
 
                 <button type="submit" className="bg-gradient-to-r from-theme-accent-start to-theme-accent-end text-white rounded-[25px] px-6 py-2.5 font-medium transition-all hover:opacity-90 shadow-md mt-4 w-full">

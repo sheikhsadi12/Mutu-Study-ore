@@ -7,11 +7,14 @@ import { cn } from '../lib/utils';
 import { supabase } from '../supabaseClient';
 
 
+import { ChatComponent } from '../components/ChatComponent';
+
 export function Home({ toggleTheme, isDarkMode, searchQuery, setSearchQuery }: any) {
   const [activeNote, setActiveNote] = useState<Note | null>(null);
   const [filter, setFilter] = useState('All');
   const [notes, setNotes] = useState<Note[]>([]);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     try {
@@ -42,13 +45,45 @@ export function Home({ toggleTheme, isDarkMode, searchQuery, setSearchQuery }: a
 
   useEffect(() => {
     const fetchNotes = async () => {
+      // 1. Initial Local Cache Load (Stale-While-Revalidate)
+      const cached = localStorage.getItem('mutu_cached_notes');
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setNotes(parsed);
+            setIsLoading(false); // Instantly show UI if we have cache
+          }
+        } catch (e) {
+          console.warn("Error parsing cached notes", e);
+        }
+      }
+
+      // 2. Fetch Fresh Data Silently
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session) {
+        // Wait for session to be fully loaded if it's currently missing
+        await new Promise(resolve => {
+           const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+              if (session) {
+                 resolve(null);
+                 authListener.subscription.unsubscribe();
+              }
+           });
+           setTimeout(() => resolve(null), 2000); // 2 second timeout fallback
+        });
+      }
+
       const { data, error } = await supabase.from('notes').select('*').order('created_at', { ascending: false });
       if (error) {
         console.error('Error fetching notes', error);
       } else if (data) {
         setNotes(data as Note[]);
+        localStorage.setItem('mutu_cached_notes', JSON.stringify(data));
       }
+      setIsLoading(false);
     };
+    
     fetchNotes();
   }, []);
 
@@ -104,20 +139,39 @@ export function Home({ toggleTheme, isDarkMode, searchQuery, setSearchQuery }: a
             </div>
           )}
 
-          {filteredNotes.length === 0 && (
+          {isLoading && notes.length === 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-6">
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <div key={i} className="card-base animate-pulse h-full">
+                   <div className="p-4 md:p-6 flex flex-col h-full bg-theme-card isolate relative">
+                     <div className="flex justify-between items-start mb-3 md:mb-4">
+                        <div className="w-10 h-10 md:w-12 md:h-12 bg-theme-muted rounded-[14px]"></div>
+                        <div className="w-16 h-5 bg-theme-muted rounded-full"></div>
+                     </div>
+                     <div className="w-3/4 h-6 bg-theme-muted rounded mb-2"></div>
+                     <div className="w-full h-4 bg-theme-muted rounded mb-1.5 flex-1"></div>
+                     <div className="w-5/6 h-4 bg-theme-muted rounded mb-1.5"></div>
+                     <div className="flex items-center justify-between pt-3 md:pt-4 border-t border-theme-border/40 mt-4 md:mt-6">
+                       <div className="w-20 h-3 bg-theme-muted rounded"></div>
+                       <div className="w-12 h-3 bg-theme-muted rounded"></div>
+                     </div>
+                   </div>
+                </div>
+              ))}
+            </div>
+          ) : filteredNotes.length === 0 ? (
              <div className="flex flex-col items-center justify-center py-24 px-6 text-center">
                <div className="w-20 h-20 mb-6 rounded-full bg-theme-muted flex items-center justify-center shadow-inner border border-theme-border/50 text-theme-accent-end/60">
                  <BookOpen className="w-10 h-10" />
                </div>
-               <h3 className="font-heading font-black text-xl text-theme-accent-end mb-2">No Modules Found</h3>
+               <h3 className="font-heading font-black text-xl text-theme-accent-end mb-2">No Dynamic Materials Found</h3>
                <p className="text-sm font-semibold opacity-70 max-w-sm mx-auto leading-relaxed text-theme-text/80">
-                 No modules found. Please upload new study materials from the Admin Panel.
+                 No dynamic materials found. Add your first note to see the magic!
                </p>
              </div>
-          )}
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-6">
-            {filteredNotes.map((note: Note) => (
+          ) : (
+             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-6">
+               {filteredNotes.map((note: Note) => (
               <div 
                 key={note.id}
                 onClick={() => setActiveNote(note)}
@@ -154,6 +208,7 @@ export function Home({ toggleTheme, isDarkMode, searchQuery, setSearchQuery }: a
               </div>
             ))}
           </div>
+          )}
         </div>
       )}
 
@@ -210,6 +265,9 @@ export function Home({ toggleTheme, isDarkMode, searchQuery, setSearchQuery }: a
           <NoteView note={activeNote} onBack={() => setActiveNote(null)} isDarkMode={isDarkMode} />
         )}
       </div>
+      
+      {/* Global AI Chat */}
+      <ChatComponent currentNote={activeNote} />
     </div>
   );
 }

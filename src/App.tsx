@@ -11,36 +11,52 @@ import { Login } from './pages/Login';
 import { PrivateRoute } from './components/PrivateRoute';
 import { supabase } from './supabaseClient';
 
+import { Profile } from './pages/Profile';
+import { Community } from './pages/Community';
+
 export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   
-  const [isDarkMode, setIsDarkMode] = useState(() => {
-    // Check local storage or existing dark class
-    const saved = localStorage.getItem('theme_preference');
-    if (saved === 'dark') {
-      document.documentElement.classList.add('dark');
-      document.documentElement.classList.remove('light');
-      return true;
-    } else if (saved === 'light') {
-      document.documentElement.classList.remove('dark');
-      document.documentElement.classList.add('light');
-      return false;
-    }
-    // Fall back to class if neither exists
-    return document.documentElement.classList.contains('dark');
+  const [themeMode, setThemeMode] = useState<'light' | 'dark' | 'system'>(() => {
+    return (localStorage.getItem('theme_preference') as 'light' | 'dark' | 'system') || 'system';
   });
 
+  useEffect(() => {
+    const applyTheme = () => {
+      const root = document.documentElement;
+      const isSystemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      
+      root.classList.remove('light', 'dark');
+      
+      if (themeMode === 'system') {
+        root.classList.add(isSystemDark ? 'dark' : 'light');
+      } else {
+        root.classList.add(themeMode);
+      }
+    };
+
+    applyTheme();
+
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange = () => {
+      if (themeMode === 'system') applyTheme();
+    };
+    mediaQuery.addEventListener('change', handleChange);
+    
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, [themeMode]);
+
   const toggleTheme = () => {
-    const isDark = document.documentElement.classList.toggle('dark');
-    if (isDark) {
-      document.documentElement.classList.remove('light');
-      localStorage.setItem('theme_preference', 'dark');
-    } else {
-      document.documentElement.classList.add('light');
-      localStorage.setItem('theme_preference', 'light');
-    }
-    setIsDarkMode(isDark);
+    // Only toggling between dark/light from the header
+    setThemeMode(prev => {
+      const nextTheme = prev === 'dark' ? 'light' : 'dark';
+      localStorage.setItem('theme_preference', nextTheme);
+      return nextTheme;
+    });
   };
+
+  const isDarkMode = document.documentElement.classList.contains('dark');
+
 
   return (
     <BrowserRouter>
@@ -64,6 +80,22 @@ export default function App() {
           element={
             <PrivateRoute adminOnly={true}>
               <Admin />
+            </PrivateRoute>
+          } 
+        />
+        <Route 
+          path="/profile" 
+          element={
+            <PrivateRoute>
+              <Profile themeMode={themeMode} setThemeMode={setThemeMode} />
+            </PrivateRoute>
+          } 
+        />
+        <Route 
+          path="/community" 
+          element={
+            <PrivateRoute>
+              <Community />
             </PrivateRoute>
           } 
         />

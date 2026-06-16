@@ -8,6 +8,8 @@ export interface Note {
   subject: string;
   chapter?: string;
   html_code: string;
+  pdf_link?: string;
+  user_id?: string;
   created_at: string;
 }
 
