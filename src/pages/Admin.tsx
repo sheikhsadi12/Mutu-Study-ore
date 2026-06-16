@@ -18,7 +18,7 @@ export function Admin({ onBack }: AdminProps) {
 
   const [isAuthenticated, setIsAuthenticated] = useState(true); // Always true via private route
   
-  const [activeTab, setActiveTab] = useState<'upload' | 'manage' | 'moderate'>('upload');
+  const [activeTab, setActiveTab] = useState<'upload' | 'manage' | 'moderate' | 'users'>('upload');
 
   // Form State
   const [editNoteId, setEditNoteId] = useState<string | null>(null);
@@ -236,6 +236,13 @@ export function Admin({ onBack }: AdminProps) {
               <MessageSquare className="w-3.5 h-3.5" />
               Moderation
             </button>
+            <button 
+              onClick={() => setActiveTab('users')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] md:text-xs font-bold transition-all ${activeTab === 'users' ? 'bg-theme-bg shadow-sm text-theme-accent-end border border-theme-border/50' : 'text-theme-text/60 hover:text-theme-text'}`}
+            >
+              <Lock className="w-3.5 h-3.5" />
+              Users
+            </button>
         </div>
       </header>
 
@@ -394,6 +401,47 @@ export function Admin({ onBack }: AdminProps) {
                           ))}
                       </div>
                   )}
+               </div>
+            </div>
+        )}
+        {/* TAB 4: MANAGE USERS */}
+        {activeTab === 'users' && (
+            <div className="card-base w-full animate-in fade-in slide-in-from-bottom-2 duration-300">
+               <div className="card-top-accent" />
+               <div className="p-4 md:p-6">
+                  <h2 className="font-heading font-bold text-base md:text-lg mb-2">User Management</h2>
+                  <p className="text-xs text-theme-text/60 mb-6 border-b border-theme-border pb-3">
+                    View and delete registered users. Note: Supabase edge functions or RPCs are required for complete server-side auth deletion.
+                  </p>
+                  
+                  <div className="space-y-3">
+                      <div className="flex gap-3 p-4 bg-theme-bg border border-theme-border rounded-lg shadow-sm group hover:border-red-500/30 transition-colors">
+                          <div className="w-10 h-10 rounded-full bg-theme-muted flex items-center justify-center font-bold text-theme-text/70 shrink-0">
+                              U
+                          </div>
+                          <div className="flex-1 min-w-0">
+                              <p className="font-bold text-sm text-theme-text truncate">example@student.com</p>
+                              <div className="flex items-center gap-2 mt-1">
+                                  <span className="text-[10px] font-black tracking-widest uppercase bg-theme-border/30 px-2 py-0.5 rounded-full text-theme-text/60">
+                                      Student
+                                  </span>
+                                  <span className="text-[10px] text-theme-text/50">ID: cee8b-uuid-placeholder</span>
+                              </div>
+                          </div>
+                          <button 
+                              onClick={async () => {
+                                 if(confirm("Are you sure you want to permanently delete this user account?")) {
+                                     // Call Edge function or RPC here e.g. await supabase.rpc('delete_user_by_id', { user_id: '...' })
+                                     alert("User deletion request sent. (Requires 'delete_user_by_id' RPC or edge function in Supabase)");
+                                 }
+                              }}
+                              className="self-center p-2 bg-red-500/10 border border-red-500/20 rounded-md text-red-600 hover:bg-red-500 hover:text-white transition-all shrink-0"
+                              title="Delete Account"
+                          >
+                              <Trash2 className="w-4 h-4" />
+                          </button>
+                      </div>
+                  </div>
                </div>
             </div>
         )}

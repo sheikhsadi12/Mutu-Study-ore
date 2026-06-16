@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
 import { useNavigate, useLocation } from 'react-router-dom';
 
@@ -6,6 +6,11 @@ export function Login() {
   const navigate = useNavigate();
   const location = useLocation();
   const from = location.state?.from?.pathname || '/';
+
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [isSignUp, setIsSignUp] = useState(false);
 
   useEffect(() => {
     supabase.auth.onAuthStateChange((event, session) => {
@@ -28,6 +33,26 @@ export function Login() {
     }
   };
 
+  const handleEmailAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    
+    try {
+      if (isSignUp) {
+        const { error } = await supabase.auth.signUp({ email, password });
+        if (error) throw error;
+        alert('Account created! Please check your email for a confirmation link (if enabled in Supabase), or sign in directly.');
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+      }
+    } catch (error: any) {
+      alert(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-theme-bg p-4 flex-col">
       <div className="w-full max-w-sm card-base shadow-xl p-8 border border-theme-border/50 bg-theme-muted/10 backdrop-blur text-center">
@@ -36,7 +61,7 @@ export function Login() {
         
         <button
           onClick={handleLogin}
-          className="w-full bg-theme-border text-theme-text/90 font-bold py-3 px-4 rounded-[14px] shadow-sm hover:opacity-90 flex items-center justify-center gap-3 transition-colors border border-theme-border"
+          className="w-full bg-theme-border text-theme-text/90 font-bold py-3 px-4 rounded-[14px] shadow-sm hover:opacity-90 flex items-center justify-center gap-3 transition-colors border border-theme-border mb-6"
         >
           <svg className="w-5 h-5" viewBox="0 0 24 24">
             <path
@@ -58,6 +83,49 @@ export function Login() {
           </svg>
           Sign in with Google
         </button>
+
+        <div className="relative flex py-2 items-center mb-6">
+          <div className="flex-grow border-t border-theme-border"></div>
+          <span className="flex-shrink-0 mx-4 text-theme-text/40 text-[10px] font-bold uppercase tracking-wider">Or</span>
+          <div className="flex-grow border-t border-theme-border"></div>
+        </div>
+
+        <form onSubmit={handleEmailAuth} className="flex flex-col gap-3">
+          <input
+            type="email"
+            placeholder="Email Address"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="w-full bg-theme-bg border border-theme-border text-theme-text text-sm rounded-lg px-4 py-2.5 outline-none focus:border-theme-accent-end transition-colors"
+            required
+          />
+          <input
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="w-full bg-theme-bg border border-theme-border text-theme-text text-sm rounded-lg px-4 py-2.5 outline-none focus:border-theme-accent-end transition-colors"
+            required
+          />
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-gradient-to-r from-theme-accent-start to-theme-accent-end text-white font-bold py-2.5 px-4 rounded-lg shadow-md hover:opacity-90 transition-opacity mt-2 disabled:opacity-50"
+          >
+            {loading ? 'Processing...' : (isSignUp ? 'Sign Up' : 'Sign In')}
+          </button>
+        </form>
+
+        <p className="mt-4 text-center text-xs text-theme-text/60">
+          {isSignUp ? 'Already have an account?' : "Don't have an account?"}
+          <button 
+            type="button"
+            onClick={() => setIsSignUp(!isSignUp)} 
+            className="ml-1 text-theme-accent-start font-bold hover:underline"
+          >
+            {isSignUp ? 'Sign In' : 'Sign Up'}
+          </button>
+        </p>
 
         <p className="mt-6 text-[10px] text-theme-text/40 tracking-wider uppercase font-bold">
           Role-Based Access Controlled

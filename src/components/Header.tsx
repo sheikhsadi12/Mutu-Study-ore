@@ -155,8 +155,27 @@ export function Header({ toggleTheme, isDarkMode, searchQuery, setSearchQuery, a
                     <MonitorSmartphone className="w-4 h-4" /> Admin Portal
                   </button>
                 )}
-                <button onClick={handleLogout} className="flex items-center gap-2.5 px-2 py-2 rounded-md hover:bg-rose-500/10 hover:text-rose-500 text-xs sm:text-sm transition-colors text-left w-full text-theme-text/80 font-medium">
+                <button onClick={handleLogout} className="flex items-center gap-2.5 px-2 py-2 mb-1 rounded-md hover:bg-rose-500/10 hover:text-rose-500 text-xs sm:text-sm transition-colors text-left w-full text-theme-text/80 font-medium">
                   <LogOut className="w-4 h-4" /> Sign Out
+                </button>
+                <button onClick={async () => {
+                  if (window.confirm("Are you sure you want to permanently delete your account? This action cannot be undone.")) {
+                    try {
+                      // Note: True deletion requires a Supabase edge function or RPC. 
+                      // Here we attempt an RPC call or fallback to logging out if missing.
+                      const { error } = await supabase.rpc('delete_user');
+                      if (error) {
+                         alert("Note: Account deletion requires the 'delete_user' RPC to be set up in your Supabase database. Please contact the administrator.");
+                      } else {
+                         await supabase.auth.signOut();
+                         navigate('/login');
+                      }
+                    } catch (e) {
+                      console.error(e);
+                    }
+                  }
+                }} className="flex items-center gap-2.5 px-2 py-2 rounded-md hover:bg-red-600 hover:text-white bg-red-500/10 text-red-500 text-xs sm:text-sm transition-colors text-left w-full font-bold mt-2">
+                  Permanently Delete Account 
                 </button>
               </div>
             </div>
