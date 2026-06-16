@@ -21,6 +21,12 @@ export function Login() {
   }, [navigate, from]);
 
   const handleLogin = async () => {
+    // Check if running inside the AI Studio iframe
+    if (window !== window.parent) {
+      alert("Google Login is blocked by Google inside preview iframes.\n\nPlease either:\n1. Use the Email/Password login below.\n2. Click the 'Open in New Tab' icon (top right of preview) to use Google Login.");
+      return;
+    }
+
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
