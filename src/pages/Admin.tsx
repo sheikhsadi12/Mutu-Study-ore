@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Upload, Lock, Code, List, MessageSquare, Edit, Trash2, BookOpen } from 'lucide-react';
 import { Note, Comment } from '../types';
+import { supabase } from '../supabaseClient';
 
 interface AdminProps {
   onBack: () => void;
@@ -30,15 +31,14 @@ export function Admin({ onBack }: AdminProps) {
     }
   }, [isAuthenticated]);
 
-  const fetchData = () => {
-    // Fetch Notes
-    const storedNotesStr = localStorage.getItem('mutu_local_notes');
-    const storedNotes: Note[] = storedNotesStr ? JSON.parse(storedNotesStr) : [];
-    
-    const uniqueStoredNotes = Array.from(new Map(storedNotes.map(n => [n.id, n])).values());
-    setLocalNotes(uniqueStoredNotes);
+  const fetchData = async () => {
+    // Fetch Notes from Supabase
+    const { data: notesData, error } = await supabase.from('notes').select('*').order('created_at', { ascending: false });
+    if (notesData && !error) {
+       setLocalNotes(notesData as Note[]);
+    }
 
-    // Fetch Comments from individual note keys (comments_{noteId})
+    // Fetch Comments securely (currently local fallback for comments if supabase doesn't have it defined, wait let me keep it as localStorage for comments unless told otherwise. Actually let's assume comments are still local, the user didn't mention moving comments).
     let aggregateComments: Comment[] = [];
     for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
@@ -72,45 +72,49 @@ export function Admin({ onBack }: AdminProps) {
     }
   };
 
-  const handleUploadSubmit = (e: React.FormEvent) => {
+  const handleUploadSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title || !rawHtml) {
-      alert("Title and Raw HTML are required.");
+    if (!title || !rawHtml || !category) {
+      alert("Title, Category and Raw HTML are required.");
       return;
     }
 
-    const noteToSave: Note = {
-      id: editNoteId ? editNoteId : crypto.randomUUID(),
+    const payload = {
       title,
       description,
       type,
       category,
-      sourceUrl: rawHtml,
-      dateAdded: editNoteId ? (localNotes.find(n => n.id === editNoteId)?.dateAdded || new Date().toISOString()) : new Date().toISOString()
+      html_code: rawHtml
     };
 
     try {
-      let updatedNotes = [...localNotes];
       if (editNoteId) {
-        updatedNotes = updatedNotes.map(n => n.id === editNoteId ? noteToSave : n);
+        const { error } = await supabase.from('notes').update(payload).eq('id', editNoteId);
+        if (error) throw error;
         alert("Material successfully updated!");
       } else {
-        updatedNotes = [noteToSave, ...updatedNotes];
+        const payloadWithId = {
+           id: crypto.randomUUID(),
+           ...payload,
+           created_at: new Date().toISOString()
+        };
+        const { error } = await supabase.from('notes').insert([payloadWithId]);
+        if (error) throw error;
         alert("Material successfully published!");
       }
       
-      localStorage.setItem('mutu_local_notes', JSON.stringify(updatedNotes));
-      setLocalNotes(updatedNotes);
+      await fetchData();
       
       // Reset Form
       setEditNoteId(null);
       setTitle('');
       setDescription('');
+      setCategory('');
       setRawHtml('');
       setActiveTab('manage');
     } catch (error) {
       console.warn("Storage exception:", error);
-      alert("Storage quota exceeded!");
+      alert("Error saving material to Supabase");
     }
   };
 
@@ -120,21 +124,22 @@ export function Admin({ onBack }: AdminProps) {
     setCategory(note.category);
     setType(note.type);
     setDescription(note.description);
-    setRawHtml(note.sourceUrl);
+    setRawHtml(note.html_code);
     setActiveTab('upload');
   };
 
-  const handleDeleteNote = (noteId: string) => {
+  const handleDeleteNote = async (noteId: string) => {
     if (confirm("Are you sure you want to delete this note?")) {
-      const updatedNotes = localNotes.filter(n => n.id !== noteId);
-      localStorage.setItem('mutu_local_notes', JSON.stringify(updatedNotes));
-      setLocalNotes(updatedNotes);
-      
-      // Also clean up associated comments and likes
-      localStorage.removeItem(`comments_${noteId}`);
-      localStorage.removeItem(`likes_${noteId}`);
-      alert("Note deleted.");
-      fetchData(); // Refresh comments list too
+      const { error } = await supabase.from('notes').delete().eq('id', noteId);
+      if (!error) {
+        // Also clean up associated comments and likes locally
+        localStorage.removeItem(`comments_${noteId}`);
+        localStorage.removeItem(`likes_${noteId}`);
+        alert("Note deleted.");
+        fetchData(); // Refresh list
+      } else {
+        alert("Error deleting note.");
+      }
     }
   };
 

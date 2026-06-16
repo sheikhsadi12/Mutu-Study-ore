@@ -7,8 +7,8 @@ export interface Note {
   type: NoteType;
   category: string;
   chapter?: string;
-  sourceUrl: string;
-  dateAdded: string;
+  html_code: string;
+  created_at: string;
 }
 
 export interface Comment {

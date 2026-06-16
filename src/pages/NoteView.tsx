@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Heart, Send, MessageCircle, Maximize2, X } from 'lucide-react';
 import { Note, Comment, LikeState } from '../types';
+import { supabase } from '../supabaseClient';
 
 interface NoteViewProps {
   note: Note;
@@ -9,6 +10,16 @@ interface NoteViewProps {
 }
 
 export function NoteView({ note, onBack, isDarkMode = false }: NoteViewProps) {
+  const [fullNote, setFullNote] = useState<Note | null>(null);
+
+  useEffect(() => {
+    const fetchNote = async () => {
+      const { data, error } = await supabase.from('notes').select('*').eq('id', note.id).single();
+      if (data && !error) setFullNote(data as Note);
+    };
+    fetchNote();
+  }, [note.id]);
+
   // LocalStorage State for Likes
   const [likes, setLikes] = useState<LikeState>(() => {
     try {
@@ -79,60 +90,6 @@ export function NoteView({ note, onBack, isDarkMode = false }: NoteViewProps) {
     setNewComment('');
   };
 
-  // Dynamic Iframe Theme Syncing
-  const getThemedHtml = (rawHtml: string, isDark: boolean) => {
-    if (!rawHtml) return '';
-    if (rawHtml.startsWith('data:application/pdf')) return rawHtml;
-
-    let html = rawHtml;
-
-    if (isDark) {
-      const stylesToInject = `
-   <style>
-     /* 1. Global Dark Background & Light Text */
-     html, body { background-color: #120206 !important; color: #f5ebe6 !important; }
-     
-     /* 2. Aggressive Light-Background Overrides */
-     .bg-white, .bg-slate-50, .bg-slate-100, .bg-rose-50, .bg-emerald-50, .bg-[#fffdf9], .bg-[#fbf7f4], .bg-[#fcf8f5], .bg-[#fff8f3], .bg-[#fffdfb] { 
-         background-color: #1a080c !important; 
-     }
-     
-     /* 3. Aggressive Dark-Text Overrides */
-     .text-slate-800, .text-slate-900, .text-slate-700, .text-slate-600, .text-slate-500, .text-[#2d1610], .text-[#3d1a10] { 
-         color: #f5ebe6 !important; 
-     }
-     
-     /* 4. Aggressive Border Overrides */
-     .border, .border-slate-100, .border-slate-200, .border-slate-150, .border-[#e1c7b3], .border-[#e8c3a2], .border-[#f2dfd1] { 
-         border-color: #4C0519 !important; 
-     }
-     
-     /* 5. Brand Color Adjustments for Dark Contrast */
-     .text-rose-600, .text-rose-700, .text-[#b91c1c], .text-[#4C0519] { color: #ff4d4d !important; }
-     .text-emerald-700 { color: #4ade80 !important; }
-     .text-indigo-600, .text-indigo-700, .text-indigo-900, .text-indigo-805 { color: #a5b4fc !important; }
-     
-     /* 6. Fix Tables and Complex Containers */
-     table, th, td, .passage-card, .qa-box, .summary-box, .author-info-box, .explain-wrapper {
-         background-color: transparent !important;
-         border-color: #4C0519 !important;
-         color: inherit !important;
-     }
-   </style>
-      `;
-
-      if (/<\/body>/i.test(html)) {
-        html = html.replace(/<\/body>/i, `${stylesToInject}</body>`);
-      } else if (/<\/html>/i.test(html)) {
-        html = html.replace(/<\/html>/i, `${stylesToInject}</html>`);
-      } else {
-        html = `${html}${stylesToInject}`;
-      }
-    }
-
-    return html;
-  };
-
   return (
     <div className={`flex flex-col h-full bg-theme-bg overflow-y-auto ${isFullscreen ? 'fixed inset-0 z-50 bg-[#fffdf9] dark:bg-[#120206] w-full min-h-screen' : ''}`} ref={scrollRef}>
       {/* Frame Container for actual note payload */}
@@ -157,16 +114,18 @@ export function NoteView({ note, onBack, isDarkMode = false }: NoteViewProps) {
           </div>
         )}
 
-        <div className={note.type === 'STATIC_A4' ? "max-w-[794px] w-full mx-auto p-0 m-0 relative h-full" : "w-full h-full p-0 m-0 relative"}>
-          {note.sourceUrl.startsWith('data:application/pdf') ? (
-            <object data={note.sourceUrl} type="application/pdf" className="w-full min-h-screen border-none block bg-white">
-              <div className="p-10 text-center w-full mt-20 font-bold opacity-50">Browser unable to inline PDF.<br /><br /> <a href={note.sourceUrl} download={note.title + ".pdf"} className="underline text-theme-accent-end">Download PDF directly</a></div>
+        <div className={note.type === 'STATIC_A4' ? `max-w-[794px] w-full mx-auto p-0 m-0 relative h-full ${isDarkMode ? 'bg-white' : ''}` : "w-full h-full p-0 m-0 relative"}>
+          {!fullNote?.html_code ? (
+            <div className="flex items-center justify-center min-h-screen opacity-50">Loading material...</div>
+          ) : fullNote.html_code.startsWith('data:application/pdf') ? (
+            <object data={fullNote.html_code} type="application/pdf" className="w-full min-h-screen border-none block bg-white">
+              <div className="p-10 text-center w-full mt-20 font-bold opacity-50">Browser unable to inline PDF.<br /><br /> <a href={fullNote.html_code} download={note.title + ".pdf"} className="underline text-theme-accent-end">Download PDF directly</a></div>
             </object>
           ) : (
             <iframe
               title={note.title}
-              srcDoc={getThemedHtml(note.sourceUrl, !!isDarkMode)}
-              className="w-full min-h-screen border-none block"
+              srcDoc={fullNote.html_code}
+              className={`w-full min-h-screen border-none block ${isDarkMode && note.type === 'STATIC_A4' ? 'bg-white' : ''}`}
               sandbox="allow-scripts allow-same-origin"
             />
           )}

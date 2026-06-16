@@ -4,6 +4,7 @@ import { NoteView } from './NoteView';
 import { Note } from '../types';
 import { FileText, LayoutGrid, Clock, ChevronRight, Lock, BookOpen } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { supabase } from '../supabaseClient';
 
 
 export function Home({ onNavigateToAdmin, toggleTheme, isDarkMode, searchQuery, setSearchQuery }: any) {
@@ -12,14 +13,15 @@ export function Home({ onNavigateToAdmin, toggleTheme, isDarkMode, searchQuery, 
   const [notes, setNotes] = useState<Note[]>([]);
 
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem('mutu_local_notes');
-      if (stored) {
-        setNotes(JSON.parse(stored) as Note[]);
+    const fetchNotes = async () => {
+      const { data, error } = await supabase.from('notes').select('*').order('created_at', { ascending: false });
+      if (error) {
+        console.error('Error fetching notes', error);
+      } else if (data) {
+        setNotes(data as Note[]);
       }
-    } catch(e) {
-      console.warn('Failed to parse local notes', e);
-    }
+    };
+    fetchNotes();
   }, []);
 
   const filteredNotes = notes.filter((n: Note) => {
@@ -101,7 +103,7 @@ export function Home({ onNavigateToAdmin, toggleTheme, isDarkMode, searchQuery, 
                   <div className="flex items-center justify-between text-[9px] md:text-[10px] text-theme-text/50 font-bold uppercase tracking-wider pt-3 md:pt-4 border-t border-theme-border/40">
                     <div className="flex items-center gap-1.5">
                       <Clock className="w-3 h-3 md:w-3.5 md:h-3.5" />
-                      {new Date(note.dateAdded).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                      {note.created_at ? new Date(note.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : ''}
                     </div>
                     <span className="text-theme-accent-end/60">{note.type === 'STATIC_A4' ? 'Document' : 'Applet'}</span>
                   </div>
