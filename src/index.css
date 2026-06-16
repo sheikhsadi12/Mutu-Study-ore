@@ -1,11 +1,11 @@
-@import url('https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Scheherazade+New:wght@400;500;600;700&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Scheherazade+New:wght@400;500;600;700&display=swap");
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
 @theme {
-  --font-sans: 'Hind Siliguri', sans-serif;
-  --font-heading: 'Playfair Display', ui-serif, Georgia, serif;
-  --font-arabic: 'Scheherazade New', serif;
+  --font-sans: "Hind Siliguri", sans-serif;
+  --font-heading: "Playfair Display", ui-serif, Georgia, serif;
+  --font-arabic: "Scheherazade New", serif;
 
   --color-theme-bg: var(--theme-bg);
   --color-theme-text: var(--theme-text);
@@ -17,36 +17,37 @@
 }
 
 @layer base {
-  :root, :root.light {
+  :root,
+  :root.light {
     --theme-bg: #fffdf9;
     --theme-text: #2d1610;
     --theme-border: #e8c3a2;
-    --theme-accent-start: #4C0519;
-    --theme-accent-end: #7C2D12;
+    --theme-accent-start: #4c0519;
+    --theme-accent-end: #7c2d12;
     --theme-card: #ffffff;
     --theme-muted: #fbf5ee;
   }
 
   @media (prefers-color-scheme: dark) {
     :root:not(.light) {
-      --theme-bg: #120206;
-      --theme-text: #f5ebe6;
-      --theme-border: #4C0519;
-      --theme-accent-start: #4C0519;
-      --theme-accent-end: #7C2D12;
-      --theme-card: #1a0409;
-      --theme-muted: #2d0b13;
+      --theme-bg: #111827;
+      --theme-text: #f3f4f6;
+      --theme-border: #374151;
+      --theme-accent-start: #4c0519;
+      --theme-accent-end: #7c2d12;
+      --theme-card: #1f2937;
+      --theme-muted: #374151;
     }
   }
 
   :root.dark {
-    --theme-bg: #120206;
-    --theme-text: #f5ebe6;
-    --theme-border: #4C0519;
-    --theme-accent-start: #4C0519;
-    --theme-accent-end: #7C2D12;
-    --theme-card: #1a0409;
-    --theme-muted: #2d0b13;
+    --theme-bg: #111827;
+    --theme-text: #f3f4f6;
+    --theme-border: #374151;
+    --theme-accent-start: #4c0519;
+    --theme-accent-end: #7c2d12;
+    --theme-card: #1f2937;
+    --theme-muted: #374151;
   }
 
   /* Scheherazade New math correction to match base text size */

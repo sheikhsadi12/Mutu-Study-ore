@@ -320,7 +320,7 @@ export function Admin({ onBack }: AdminProps) {
 
                 <div className="flex flex-col gap-1.5 mt-2">
                     <label className="text-[10px] md:text-xs font-bold text-theme-text/70 uppercase flex items-center gap-1"><Code className="w-3 h-3"/> Content (Markdown or HTML) *</label>
-                    <textarea required rows={12} value={rawHtmlText} onChange={(e) => setRawHtmlText(e.target.value)} placeholder="# Heading\n\nWrite your Markdown content here..." className="px-3 py-3 font-mono bg-[#1e1e1e] border border-theme-border rounded-md text-xs text-white focus:border-theme-accent-end outline-none shadow-inner" />
+                    <textarea required rows={12} value={rawHtmlText} onChange={(e) => setRawHtmlText(e.target.value)} placeholder="# Heading\n\nWrite your Markdown content here..." className="px-3 py-3 font-mono bg-[#111827] border border-theme-border rounded-md text-xs text-slate-50 focus:border-theme-accent-end outline-none shadow-inner" />
                 </div>
 
                 <button type="submit" className="bg-gradient-to-r from-theme-accent-start to-theme-accent-end text-white rounded-[25px] px-6 py-2.5 font-medium transition-all hover:opacity-90 shadow-md mt-4 w-full">
