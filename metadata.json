@@ -1,0 +1,6 @@
+{
+  "name": "Mutu Study Core",
+  "description": "Premium zero-backend PWA with dual-system architecture for desktop portal and mobile simulation.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

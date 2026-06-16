@@ -1,0 +1,86 @@
+@import url('https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Scheherazade+New:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Hind Siliguri', ui-sans-serif, system-ui, sans-serif;
+  --font-heading: 'Playfair Display', ui-serif, Georgia, serif;
+  --font-arabic: 'Scheherazade New', serif;
+
+  --color-theme-bg: var(--theme-bg);
+  --color-theme-text: var(--theme-text);
+  --color-theme-border: var(--theme-border);
+  --color-theme-accent-start: var(--theme-accent-start);
+  --color-theme-accent-end: var(--theme-accent-end);
+  --color-theme-card: var(--theme-card);
+  --color-theme-muted: var(--theme-muted);
+}
+
+@layer base {
+  :root, :root.light {
+    --theme-bg: #fffdf9;
+    --theme-text: #2d1610;
+    --theme-border: #e8c3a2;
+    --theme-accent-start: #4C0519;
+    --theme-accent-end: #7C2D12;
+    --theme-card: #ffffff;
+    --theme-muted: #fbf5ee;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not(.light) {
+      --theme-bg: #120206;
+      --theme-text: #f5ebe6;
+      --theme-border: #4C0519;
+      --theme-accent-start: #4C0519;
+      --theme-accent-end: #7C2D12;
+      --theme-card: #1a0409;
+      --theme-muted: #2d0b13;
+    }
+  }
+
+  :root.dark {
+    --theme-bg: #120206;
+    --theme-text: #f5ebe6;
+    --theme-border: #4C0519;
+    --theme-accent-start: #4C0519;
+    --theme-accent-end: #7C2D12;
+    --theme-card: #1a0409;
+    --theme-muted: #2d0b13;
+  }
+
+  /* Scheherazade New math correction to match base text size */
+  .font-arabic {
+    font-size: 1em;
+    line-height: normal;
+  }
+}
+
+body {
+  @apply bg-theme-bg text-theme-text font-sans antialiased;
+}
+
+/* Base custom classes to match precise radius/borders requested */
+.card-base {
+  @apply bg-theme-card rounded-md border border-theme-border shadow-sm flex flex-col overflow-hidden;
+}
+
+.card-top-accent {
+  @apply h-[3px] w-full bg-gradient-to-r from-theme-accent-start to-theme-accent-end;
+}
+
+.btn-primary {
+  @apply rounded-[25px] px-6 py-2.5 font-medium flex items-center justify-center transition-all cursor-pointer bg-gradient-to-r from-theme-accent-start to-theme-accent-end text-white shadow-md hover:shadow-lg hover:opacity-90;
+}
+
+@media (prefers-color-scheme: dark) {
+  .btn-primary {
+    box-shadow: 0 0 15px rgba(124, 45, 18, 0.4);
+  }
+  .dark-glow {
+    box-shadow: 0 0 20px rgba(124, 45, 18, 0.15);
+  }
+}
+
+.btn-secondary {
+  @apply rounded-[25px] px-6 py-2.5 font-medium flex items-center justify-center transition-all cursor-pointer bg-theme-muted text-theme-text hover:opacity-80;
+}
