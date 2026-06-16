@@ -11,6 +11,34 @@ export function Home({ onNavigateToAdmin, toggleTheme, isDarkMode, searchQuery, 
   const [activeNote, setActiveNote] = useState<Note | null>(null);
   const [filter, setFilter] = useState('All');
   const [notes, setNotes] = useState<Note[]>([]);
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('mutu_recent_searches');
+      if (stored) {
+        setRecentSearches(JSON.parse(stored));
+      }
+    } catch (e) {
+      console.warn('Failed to parse recent searches', e);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!searchQuery?.trim()) return;
+
+    const timeoutId = setTimeout(() => {
+      setRecentSearches(prev => {
+        const query = searchQuery.trim();
+        const filtered = prev.filter(q => q.toLowerCase() !== query.toLowerCase());
+        const updated = [query, ...filtered].slice(0, 5);
+        localStorage.setItem('mutu_recent_searches', JSON.stringify(updated));
+        return updated;
+      });
+    }, 1000);
+
+    return () => clearTimeout(timeoutId);
+  }, [searchQuery]);
 
   useEffect(() => {
     const fetchNotes = async () => {
@@ -60,6 +88,21 @@ export function Home({ onNavigateToAdmin, toggleTheme, isDarkMode, searchQuery, 
               ))}
             </div>
           </div>
+
+          {recentSearches.length > 0 && !searchQuery && (
+            <div className="mb-6 flex flex-wrap items-center gap-2">
+              <span className="text-[10px] md:text-xs font-bold text-theme-text/50 uppercase tracking-widest mr-2">Recent Searches:</span>
+              {recentSearches.map(term => (
+                <button
+                  key={term}
+                  onClick={() => setSearchQuery(term)}
+                  className="px-2.5 py-1 text-[10px] md:text-xs rounded-full bg-theme-muted/50 border border-theme-border/50 text-theme-text/70 hover:bg-theme-muted hover:text-theme-accent-end transition-colors"
+                >
+                  {term}
+                </button>
+              ))}
+            </div>
+          )}
 
           {filteredNotes.length === 0 && (
              <div className="flex flex-col items-center justify-center py-24 px-6 text-center">
