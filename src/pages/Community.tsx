@@ -186,7 +186,7 @@ export function Community() {
     if (subscriptionRef.current) return;
 
     const channel = supabase
-      .channel('schema-db-changes')
+      .channel(`community_messages_${Date.now()}`)
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'community_messages' },

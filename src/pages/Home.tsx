@@ -2,12 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Header } from '../components/Header';
 import { NoteView } from './NoteView';
 import { Note } from '../types';
-import { FileText, LayoutGrid, Clock, ChevronRight, Lock, BookOpen } from 'lucide-react';
+import { FileText, LayoutGrid, Clock, ChevronRight, Lock, BookOpen, List } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { supabase } from '../supabaseClient';
-
-
-import { ChatComponent } from '../components/ChatComponent';
 
 export function Home({ toggleTheme, isDarkMode, searchQuery, setSearchQuery }: any) {
   const [activeNote, setActiveNote] = useState<Note | null>(null);
@@ -15,6 +12,7 @@ export function Home({ toggleTheme, isDarkMode, searchQuery, setSearchQuery }: a
   const [notes, setNotes] = useState<Note[]>([]);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
   useEffect(() => {
     try {
@@ -103,8 +101,24 @@ export function Home({ toggleTheme, isDarkMode, searchQuery, setSearchQuery }: a
       {!condensed && (
         <div className="max-w-5xl mx-auto">
           <div className="flex flex-col mb-4 md:mb-6 gap-3 border-b border-theme-border/50 pb-4">
-            <div>
+            <div className="flex justify-between items-center">
               <h2 className="text-theme-text/70 font-bold uppercase tracking-widest text-xs md:text-sm">Knowledge Base Modules</h2>
+              <div className="flex items-center gap-1 bg-theme-muted/30 border border-theme-border/50 rounded-full p-1">
+                <button 
+                  onClick={() => setViewMode('grid')}
+                  className={cn("p-1.5 rounded-full transition-colors", viewMode === 'grid' ? "bg-theme-bg shadow-sm text-theme-accent-end" : "text-theme-text/50 hover:text-theme-text/80")}
+                  title="Grid View"
+                >
+                  <LayoutGrid className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                </button>
+                <button 
+                  onClick={() => setViewMode('list')}
+                  className={cn("p-1.5 rounded-full transition-colors", viewMode === 'list' ? "bg-theme-bg shadow-sm text-theme-accent-end" : "text-theme-text/50 hover:text-theme-text/80")}
+                  title="List View"
+                >
+                  <List className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                </button>
+              </div>
             </div>
             <div className="flex flex-wrap gap-2">
               {subjects.map(f => (
@@ -170,42 +184,75 @@ export function Home({ toggleTheme, isDarkMode, searchQuery, setSearchQuery }: a
                </p>
              </div>
           ) : (
-             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-6">
+             <div className={cn("grid gap-3 md:gap-4", viewMode === 'grid' ? "grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5" : "grid-cols-1")}>
                {filteredNotes.map((note: Note) => (
-              <div 
-                key={note.id}
-                onClick={() => setActiveNote(note)}
-                className={cn(
-                  "card-base relative group cursor-pointer transition-all hover:shadow-[0_8px_30px_rgb(0,0,0,0.06)] md:hover:-translate-y-1 h-full",
-                  activeNote?.id === note.id ? "ring-2 ring-theme-accent-end ring-offset-2 ring-offset-theme-bg" : ""
-                )}
-              >
-                <div className="card-top-accent" />
-                <div className="p-4 md:p-6 flex flex-col h-full bg-theme-card isolate relative">
-                  <div className="flex justify-between items-start mb-3 md:mb-4">
-                    <div className="p-2.5 md:p-3 bg-theme-muted rounded-[14px] text-theme-accent-end group-hover:scale-110 transition-transform">
-                      {note.type === 'STATIC_A4' ? <FileText className="w-4 h-4 md:w-6 md:h-6"/> : <LayoutGrid className="w-4 h-4 md:w-6 md:h-6"/>}
+                 viewMode === 'grid' ? (
+                  <div 
+                    key={note.id}
+                    onClick={() => setActiveNote(note)}
+                    className={cn(
+                      "card-base relative group cursor-pointer transition-all hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] md:hover:-translate-y-1 h-full",
+                      activeNote?.id === note.id ? "ring-2 ring-theme-accent-end ring-offset-2 ring-offset-theme-bg" : ""
+                    )}
+                  >
+                    <div className="card-top-accent !h-0.5 opacity-50" />
+                    <div className="p-3 md:p-4 flex flex-col h-full bg-theme-card isolate relative text-left">
+                      <div className="flex w-full justify-between items-start mb-4">
+                        <div className="p-2.5 md:p-3 bg-theme-muted/50 border border-theme-border/60 rounded-xl md:rounded-2xl text-theme-accent-end group-hover:scale-110 group-hover:-translate-y-0.5 transition-all shadow-[0_2px_10px_rgb(0,0,0,0.03)]">
+                          {note.type === 'STATIC_A4' ? <FileText className="w-5 h-5 md:w-6 md:h-6"/> : <LayoutGrid className="w-5 h-5 md:w-6 md:h-6"/>}
+                        </div>
+                        <span className="text-[9px] md:text-[10px] font-bold tracking-wider uppercase bg-theme-border/40 px-2 py-0.5 md:py-1 rounded-md text-theme-accent-end/90 mt-1">
+                          {note.subject}
+                        </span>
+                      </div>
+                      <h3 className="font-heading font-bold text-base md:text-lg mb-2 group-hover:text-theme-accent-end transition-colors line-clamp-2 leading-tight">{note.title}</h3>
+                      <p className="text-xs md:text-sm text-theme-text/70 mb-5 flex-1 font-arabic line-clamp-2 leading-relaxed">
+                        {note.description}
+                      </p>
+                      <div className="flex items-center justify-between text-[10px] md:text-xs text-theme-text/50 font-bold uppercase tracking-wider pt-3 border-t border-theme-border/50 w-full mt-auto">
+                        <span className="group-hover:text-theme-text/70 transition-colors">{note.type === 'STATIC_A4' ? 'DOCUMENT' : 'PLATFORM'}</span>
+                        <div className="flex items-center gap-1.5 group-hover:text-theme-text/70 transition-colors">
+                          <Clock className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                          {note.created_at ? new Date(note.created_at).toLocaleDateString(undefined, { month: '2-digit', day: '2-digit', year: '2-digit' }) : ''}
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex flex-col items-end gap-1">
-                      <span className="text-[8px] md:text-[9px] font-black tracking-widest uppercase bg-theme-border/20 px-2 md:px-3 py-1 md:py-1.5 rounded-full text-theme-accent-end">
-                        {note.subject}
+                  </div>
+                 ) : (
+                  <div 
+                    key={note.id}
+                    onClick={() => setActiveNote(note)}
+                    className={cn(
+                      "group cursor-pointer transition-all hover:bg-theme-muted/20 border border-theme-border/30 hover:border-theme-border/60 rounded-xl flex items-center py-2.5 px-3 md:py-3.5 md:px-4 gap-4 bg-theme-card relative shadow-sm hover:shadow-md text-left",
+                      activeNote?.id === note.id ? "ring-2 ring-theme-accent-end bg-theme-muted/30" : ""
+                    )}
+                  >
+                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-theme-accent-end/20 group-hover:bg-theme-accent-end transition-colors" />
+                    <div className="p-2.5 md:p-3 bg-theme-muted/50 border border-theme-border/60 rounded-xl md:rounded-2xl text-theme-accent-end group-hover:scale-110 group-hover:-translate-y-0.5 transition-all shrink-0 shadow-sm ml-1 md:ml-2">
+                      {note.type === 'STATIC_A4' ? <FileText className="w-5 h-5 md:w-6 md:h-6"/> : <LayoutGrid className="w-5 h-5 md:w-6 md:h-6"/>}
+                    </div>
+                    <div className="flex-1 min-w-0 pl-2 pr-4 border-r border-theme-border/50 py-1">
+                      <div className="flex items-center gap-3 mb-1">
+                        <span className="text-[9px] md:text-[10px] font-black tracking-widest uppercase bg-theme-border/30 px-2 py-0.5 md:py-1 rounded text-theme-accent-end/90 shrink-0 hidden sm:inline-block">
+                          {note.subject}
+                        </span>
+                        <h3 className="font-heading font-bold text-sm md:text-base group-hover:text-theme-accent-end transition-colors truncate">{note.title}</h3>
+                      </div>
+                      <p className="text-xs md:text-sm text-theme-text/70 font-arabic truncate mt-1">
+                        {note.description}
+                      </p>
+                    </div>
+                    <div className="flex flex-col items-end justify-center shrink-0 w-24 md:w-28 pl-4 pr-1 md:pr-2">
+                      <span className="text-[9px] md:text-[10px] font-bold uppercase tracking-wider text-theme-text/50 mb-1.5 group-hover:text-theme-text/70 transition-colors">
+                        {note.type === 'STATIC_A4' ? 'DOCUMENT' : 'PLATFORM'}
                       </span>
-                      {note.chapter && <span className="text-[8px] font-bold opacity-60 uppercase">{note.chapter}</span>}
+                      <div className="flex items-center gap-1.5 text-[10px] md:text-xs text-theme-text/60 font-semibold group-hover:text-theme-text/80 transition-colors">
+                        <Clock className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                        {note.created_at ? new Date(note.created_at).toLocaleDateString(undefined, { month: '2-digit', day: '2-digit', year: '2-digit' }) : ''}
+                      </div>
                     </div>
                   </div>
-                  <h3 className="font-heading font-bold text-base md:text-xl mb-1.5 md:mb-2 group-hover:text-theme-accent-end transition-colors line-clamp-2 md:min-h-[56px]">{note.title}</h3>
-                  <p className="text-xs md:text-sm text-theme-text/80 mb-4 md:mb-6 flex-1 font-arabic line-clamp-3 md:leading-relaxed">
-                    {note.description}
-                  </p>
-                  <div className="flex items-center justify-between text-[9px] md:text-[10px] text-theme-text/50 font-bold uppercase tracking-wider pt-3 md:pt-4 border-t border-theme-border/40">
-                    <div className="flex items-center gap-1.5">
-                      <Clock className="w-3 h-3 md:w-3.5 md:h-3.5" />
-                      {note.created_at ? new Date(note.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : ''}
-                    </div>
-                    <span className="text-theme-accent-end/60">{note.type === 'STATIC_A4' ? 'Document' : 'Applet'}</span>
-                  </div>
-                </div>
-              </div>
+                 )
             ))}
           </div>
           )}
@@ -265,9 +312,6 @@ export function Home({ toggleTheme, isDarkMode, searchQuery, setSearchQuery }: a
           <NoteView note={activeNote} onBack={() => setActiveNote(null)} isDarkMode={isDarkMode} />
         )}
       </div>
-      
-      {/* Global AI Chat */}
-      <ChatComponent currentNote={activeNote} />
     </div>
   );
 }

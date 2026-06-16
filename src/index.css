@@ -7,6 +7,12 @@
   --font-heading: "Playfair Display", ui-serif, Georgia, serif;
   --font-arabic: "Scheherazade New", serif;
 
+  --color-mutu-darkest: #2a020b;
+  --color-mutu-dark: #4c0519;
+  --color-mutu-accent: #7c2d12;
+  --color-mutu-soft: #e8c3a2;
+  --color-mutu-bg: #fffdf9;
+
   --color-theme-bg: var(--theme-bg);
   --color-theme-text: var(--theme-text);
   --color-theme-border: var(--theme-border);
@@ -30,24 +36,24 @@
 
   @media (prefers-color-scheme: dark) {
     :root:not(.light) {
-      --theme-bg: #111827;
-      --theme-text: #f3f4f6;
-      --theme-border: #374151;
+      --theme-bg: #130004;
+      --theme-text: #fff6ee;
+      --theme-border: #7c2d12;
       --theme-accent-start: #4c0519;
       --theme-accent-end: #7c2d12;
-      --theme-card: #1f2937;
-      --theme-muted: #374151;
+      --theme-card: #2a020b;
+      --theme-muted: rgba(124, 45, 18, 0.4);
     }
   }
 
   :root.dark {
-    --theme-bg: #111827;
-    --theme-text: #f3f4f6;
-    --theme-border: #374151;
+    --theme-bg: #130004;
+    --theme-text: #fff6ee;
+    --theme-border: #7c2d12;
     --theme-accent-start: #4c0519;
     --theme-accent-end: #7c2d12;
-    --theme-card: #1f2937;
-    --theme-muted: #374151;
+    --theme-card: #2a020b;
+    --theme-muted: rgba(124, 45, 18, 0.4);
   }
 
   /* Scheherazade New math correction to match base text size */

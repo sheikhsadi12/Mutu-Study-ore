@@ -4,15 +4,43 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Home } from './pages/Home';
 import { Admin } from './pages/Admin';
 import { Login } from './pages/Login';
 import { PrivateRoute } from './components/PrivateRoute';
 import { supabase } from './supabaseClient';
+import { MessageCircle, Bot } from 'lucide-react';
 
 import { Profile } from './pages/Profile';
 import { Community } from './pages/Community';
+import { AiChat } from './pages/AiChat';
+
+function GlobalFABs() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  
+  if (location.pathname !== '/') return null;
+
+  return (
+    <div className="fixed bottom-6 right-6 z-[60] flex flex-col gap-3">
+      <button 
+        onClick={() => navigate('/community')}
+        className="w-12 h-12 rounded-full shadow-lg flex items-center justify-center transition-all duration-300 bg-theme-bg border border-theme-border text-theme-accent-end hover:scale-105 hover:bg-theme-muted active:scale-95"
+        title="Community"
+      >
+        <MessageCircle className="w-5 h-5" />
+      </button>
+      <button 
+        onClick={() => navigate('/ai-chat')}
+        className="w-12 h-12 rounded-full shadow-lg flex items-center justify-center transition-all duration-300 bg-gradient-to-tr from-theme-accent-start to-theme-accent-end text-white hover:scale-105 active:scale-95"
+        title="AI Chat"
+      >
+        <Bot className="w-6 h-6" />
+      </button>
+    </div>
+  );
+}
 
 export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -60,6 +88,7 @@ export default function App() {
 
   return (
     <BrowserRouter>
+      <GlobalFABs />
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route 
@@ -71,6 +100,17 @@ export default function App() {
                 isDarkMode={isDarkMode}
                 searchQuery={searchQuery}
                 setSearchQuery={setSearchQuery}
+              />
+            </PrivateRoute>
+          } 
+        />
+        <Route 
+          path="/ai-chat" 
+          element={
+            <PrivateRoute>
+              <AiChat 
+                toggleTheme={toggleTheme} 
+                isDarkMode={isDarkMode}
               />
             </PrivateRoute>
           } 

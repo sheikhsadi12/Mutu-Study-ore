@@ -73,57 +73,40 @@ export function Header({ toggleTheme, isDarkMode, searchQuery, setSearchQuery, a
         )}
       </div>
 
-      <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-        {/* Toggle Search Bar on Mobile */}
+      <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
         {!activeNote && (
-          <div className={cn("relative group flex items-center transition-all", searchOpen ? "w-48 sm:w-64" : "w-auto")}>
-            <Search 
-              onClick={() => setSearchOpen(!searchOpen)}
-              className="w-4 h-4 text-theme-text/80 sm:hidden cursor-pointer p-0.5 hover:bg-theme-muted rounded-full" 
-            />
-            <Search className={cn("w-3.5 h-3.5 text-theme-text/50 absolute left-2.5 hidden sm:block", searchOpen && 'block')} />
+          <div className="relative flex items-center">
+            <Search className={cn("w-4 h-4 absolute left-3 pointer-events-none transition-colors", (searchQuery || searchOpen) ? "text-theme-accent-end" : "text-theme-text/60")} />
             <input 
               type="text" 
               placeholder="Search..." 
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              onFocus={() => setSearchOpen(true)}
+              onBlur={() => setSearchOpen(false)}
               className={cn(
-                "py-1.5 bg-theme-muted/50 border border-theme-border/50 rounded-full text-xs focus:outline-none focus:border-theme-accent-end focus:ring-1 focus:ring-theme-accent-end transition-all",
-                searchOpen ? "pl-8 pr-3 w-full block" : "hidden sm:block pl-8 pr-3 w-32 md:w-48 xl:w-64"
+                "py-1.5 pl-9 pr-4 rounded-full text-xs outline-none transition-all duration-300",
+                "bg-theme-muted/30 border border-theme-border/50 text-theme-text",
+                (searchQuery || searchOpen) 
+                  ? "w-48 sm:w-64 max-w-[50vw] bg-theme-bg border-theme-accent-end placeholder:text-theme-text/40 ring-1 ring-theme-accent-end/30" 
+                  : "w-10 cursor-pointer text-transparent placeholder:text-transparent hover:bg-theme-muted/50",
+                "focus:w-48 sm:focus:w-64 focus:max-w-xs focus:bg-theme-bg focus:border-theme-accent-end focus:ring-1 focus:ring-theme-accent-end/50 focus:text-theme-text focus:placeholder:text-theme-text/40 focus:cursor-text"
               )}
             />
           </div>
         )}
 
-        {activeNote && activeNote.type === 'STATIC_A4' && (
-           <button 
-             onClick={() => alert('Print triggered! (Simulation only)')} 
-             className="p-1.5 sm:p-2 rounded-full hover:bg-theme-muted transition-colors text-theme-accent-end dark:text-theme-text" 
-             title="Print to PDF"
-           >
-             <Printer className="w-4 h-4 sm:w-5 sm:h-5" />
-           </button>
-        )}
-
-        <button 
-          onClick={() => navigate('/community')}
-          className="p-1.5 sm:p-2 rounded-full hover:bg-theme-muted transition-colors text-theme-text/80"
-          title="Community Chat"
-        >
-          <MessageCircle className="w-4 h-4 sm:w-5 sm:h-5" />
-        </button>
-
         <button 
           onClick={toggleTheme} 
-          className="p-1.5 sm:p-2 rounded-full hover:bg-theme-muted transition-colors text-theme-text/80"
+          className="p-1.5 sm:p-2 rounded-full hover:bg-theme-muted transition-colors text-theme-text/80 outline-none"
         >
           {isDarkMode ? <Sun className="w-4 h-4 sm:w-5 sm:h-5" /> : <Moon className="w-4 h-4 sm:w-5 sm:h-5" />} 
         </button>
 
-        <div className="relative flex items-center border-l border-theme-border pl-1 sm:pl-2 ml-1 sm:ml-2">
+        <div className="relative flex items-center border-l border-theme-border pl-1.5 sm:pl-2 ml-0 sm:ml-1">
           <button 
             onClick={() => navigate('/profile')}
-            className="flex items-center justify-center w-6 h-6 sm:w-8 sm:h-8 overflow-hidden p-0 rounded-full border-2 border-theme-accent-start bg-theme-border hover:border-theme-accent-end transition-colors cursor-pointer shrink-0"
+            className="flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 overflow-hidden p-0 rounded-full border border-theme-border bg-theme-muted hover:border-theme-accent-end transition-colors cursor-pointer shrink-0 outline-none ring-offset-theme-bg focus-visible:ring-2 focus-visible:ring-theme-accent-end ring-offset-1"
           >
             {user?.user_metadata?.avatar_url ? (
               <img src={user.user_metadata.avatar_url} alt="Profile" className="w-full h-full object-cover" />
