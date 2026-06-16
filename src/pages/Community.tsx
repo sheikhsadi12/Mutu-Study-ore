@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { ArrowLeft, Send, MessageCircle, User, Loader2, X } from 'lucide-react';
+import { ArrowLeft, Send, MessageCircle, User, Loader2, X, Trash2, Ban } from 'lucide-react';
 import { User as AuthUser } from '@supabase/supabase-js';
 import { cn } from '../lib/utils';
 
@@ -9,6 +9,7 @@ interface ProfileData {
   id: string;
   username: string;
   avatar_url: string;
+  is_banned?: boolean;
 }
 
 interface Message {
@@ -22,9 +23,24 @@ interface Message {
 
 const AVATAR_SEEDS = ['bot1', 'bot2', 'bot3', 'bot4', 'bot5', 'bot6', 'bot7', 'bot8'];
 
-const ChatBubble = React.memo(({ msg, isMe, showHeader }: { msg: Message, isMe: boolean, showHeader: boolean }) => {
+const ChatBubble = React.memo(({ msg, isMe, showHeader, isAdmin, onDelete, onBan }: { msg: Message, isMe: boolean, showHeader: boolean, isAdmin: boolean, onDelete: (id: string) => void, onBan: (userId: string) => void }) => {
   return (
-    <div className={cn("flex flex-col w-full", isMe ? "items-end" : "items-start", !showHeader ? "mt-1" : "mt-4")}>
+    <div className={cn("flex flex-col w-full group", isMe ? "items-end" : "items-start", !showHeader ? "mt-1" : "mt-4")}>
+      {/* Admin X-RAY Vision Header */}
+      {isAdmin && (
+         <div className={cn("flex items-center gap-2 mb-1 z-10", isMe ? "mr-2" : "ml-2")}>
+            <span className="text-[9px] font-mono text-red-500/60 bg-red-500/10 px-1 py-0.5 rounded">{msg.user_id}</span>
+            {!isMe && (
+              <button onClick={() => onBan(msg.user_id)} className="text-[10px] text-red-500 hover:bg-red-500/20 px-1.5 py-0.5 rounded flex items-center gap-1 font-bold bg-red-500/10 transition-colors">
+                 <Ban className="w-3 h-3" /> Ban 🚫
+              </button>
+            )}
+            <button onClick={() => onDelete(msg.id)} className="text-[10px] text-red-500 hover:bg-red-500/20 px-1.5 py-0.5 rounded flex items-center gap-1 font-bold bg-red-500/10 transition-colors">
+               <Trash2 className="w-3 h-3" /> Delete 🗑️
+            </button>
+         </div>
+      )}
+
       {showHeader && !isMe && (
          <div className="flex items-center gap-2 mb-1.5 ml-1">
             <img src={msg.avatar_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${msg.user_id}`} alt="Avatar" className="w-5 h-5 rounded-full bg-theme-muted" />
@@ -33,13 +49,22 @@ const ChatBubble = React.memo(({ msg, isMe, showHeader }: { msg: Message, isMe: 
          </div>
       )}
       
-      <div className={cn(
-        "max-w-[85%] md:max-w-[70%] px-4 py-2 text-sm leading-relaxed whitespace-pre-wrap break-words",
-        isMe 
-         ? "bg-theme-accent-start text-white rounded-2xl rounded-tr-sm" 
-         : "bg-theme-card border border-theme-border/50 text-theme-text rounded-2xl rounded-tl-sm shadow-sm"
-      )}>
-         {msg.message}
+      <div className="flex items-center gap-2 max-w-full">
+        {/* Regular user delete button for own messages (Admin does not need this, they have the big red button above) */}
+        {isMe && !isAdmin && (
+          <button onClick={() => onDelete(msg.id)} className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 text-red-400 hover:text-red-500 hover:bg-red-500/10 rounded-full shrink-0" title="Delete Message">
+             <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        )}
+        
+        <div className={cn(
+          "max-w-[85%] md:max-w-[70%] px-4 py-2 text-sm leading-relaxed whitespace-pre-wrap break-words relative",
+          isMe 
+          ? "bg-theme-accent-start text-white rounded-2xl rounded-tr-sm" 
+          : "bg-theme-card border border-theme-border/50 text-theme-text rounded-2xl rounded-tl-sm shadow-sm"
+        )}>
+          {msg.message}
+        </div>
       </div>
 
       {showHeader && isMe && (
@@ -71,6 +96,52 @@ export function Community() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const subscriptionRef = useRef<any>(null);
+
+  const isAdmin = user?.email === 'sadishekh671@gmail.com';
+
+  const handleDeleteMessage = async (messageId: string) => {
+    try {
+      setMessages(prev => prev.filter(m => m.id !== messageId)); // Optimistic UI
+      const { error } = await supabase.from('community_messages').delete().eq('id', messageId);
+      if (error) {
+         fetchMessages(); // Revert on error
+         throw error;
+      }
+    } catch (e: any) {
+      console.error('Error deleting message:', e);
+      alert('Failed to delete message.');
+    }
+  };
+
+  const handleBanUser = async (userId: string) => {
+    if (!window.confirm("Are you sure you want to ban this user?")) return;
+    try {
+      const { error } = await supabase.from('profiles').update({ is_banned: true }).eq('id', userId);
+      if (error) throw error;
+      alert('User successfully banned.');
+    } catch (e: any) {
+      console.error('Error banning user:', e);
+      alert('Failed to ban user.');
+    }
+  };
+
+  const handleClearAllMessages = async () => {
+    if (!window.confirm("Are you sure you want to permanently delete ALL messages for everyone?")) return;
+    try {
+      setMessages([]);
+      // The user specifically requested `.neq('id', 0)` approach to satisfy Supabase's require-filter-for-deletes.
+      // We will cast to any to satisfy TS, though practically .neq('id', '00000000-0000-0000-0000-000000000000') is safer for UUID columns
+      const { error } = await supabase.from('community_messages').delete().neq('id', '00000000-0000-0000-0000-000000000000' as any);
+      if (error) {
+        // Fallback to literal 0 if the id is actually a numeric serial column
+        await supabase.from('community_messages').delete().neq('id', 0 as any);
+      }
+    } catch (e: any) {
+      console.error('Error clearing messages:', e);
+      alert('Failed to clear messages.');
+      fetchMessages();
+    }
+  };
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -198,6 +269,13 @@ export function Community() {
           scrollToBottom();
         }
       )
+      .on(
+        'postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'community_messages' },
+        (payload) => {
+          setMessages(prev => prev.filter(m => m.id !== payload.old.id));
+        }
+      )
       .subscribe();
 
     subscriptionRef.current = channel;
@@ -276,19 +354,30 @@ export function Community() {
             </div>
         </div>
         
-        {profile && (
-             <button 
-                onClick={() => {
-                   setNewUsername(profile.username);
-                   setNewAvatar(profile.avatar_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${AVATAR_SEEDS[0]}`);
-                   setShowSetup(true);
-                }}
-                className="flex items-center gap-2 p-1.5 sm:px-3 sm:py-2 text-xs font-bold text-theme-text/70 bg-theme-muted/50 hover:bg-theme-muted rounded-full transition-colors border border-theme-border"
+        <div className="flex items-center gap-2">
+          {isAdmin && (
+             <button
+               onClick={handleClearAllMessages}
+               className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-500 text-xs font-bold rounded-full transition-colors border border-red-500/20 mr-1 sm:mr-2"
              >
-                <img src={profile.avatar_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${user.id}`} alt="Me" className="w-5 h-5 rounded-full" />
-                <span className="hidden sm:inline truncate max-w-[100px]">{profile.username}</span>
+               <Trash2 className="w-3.5 h-3.5" />
+               <span className="hidden sm:inline">Clear Chat</span>
              </button>
-        )}
+          )}
+          {profile && (
+               <button 
+                  onClick={() => {
+                     setNewUsername(profile.username);
+                     setNewAvatar(profile.avatar_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${AVATAR_SEEDS[0]}`);
+                     setShowSetup(true);
+                  }}
+                  className="flex items-center gap-2 p-1.5 sm:px-3 sm:py-2 text-xs font-bold text-theme-text/70 bg-theme-muted/50 hover:bg-theme-muted rounded-full transition-colors border border-theme-border"
+               >
+                  <img src={profile.avatar_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${user.id}`} alt="Me" className="w-5 h-5 rounded-full shrink-0" />
+                  <span className="hidden sm:inline truncate max-w-[100px]">{profile.username}</span>
+               </button>
+          )}
+        </div>
       </header>
 
       {showSetup ? (
@@ -374,29 +463,44 @@ export function Community() {
                  const showHeader = idx === 0 || messages[idx - 1].user_id !== msg.user_id || 
                     (new Date(msg.created_at).getTime() - new Date(messages[idx - 1].created_at).getTime() > 5 * 60000); // 5 mins gap
 
-                 return <ChatBubble key={msg.id} msg={msg} isMe={isMe} showHeader={showHeader} />;
+                 return <ChatBubble 
+                   key={msg.id} 
+                   msg={msg} 
+                   isMe={isMe} 
+                   showHeader={showHeader}
+                   isAdmin={isAdmin}
+                   onDelete={handleDeleteMessage}
+                   onBan={handleBanUser}
+                 />;
                })
             )}
             <div ref={messagesEndRef} className="h-2 shrink-0" />
           </main>
 
           <footer className="p-4 border-t border-theme-border bg-theme-bg shrink-0">
-             <form onSubmit={handleSendMessage} className="max-w-4xl mx-auto relative flex items-center">
-                <input 
-                  type="text"
-                  placeholder={`Message as ${profile?.username}...`}
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  className="w-full bg-theme-muted/30 border border-theme-border rounded-full py-3.5 pl-6 pr-14 text-sm focus:outline-none focus:border-theme-accent-end transition-all text-theme-text"
-                />
-                <button 
-                  type="submit"
-                  disabled={!newMessage.trim()}
-                  className="absolute right-2 p-2 bg-theme-accent-end text-white rounded-full disabled:opacity-50 hover:scale-105 transition-transform"
-                >
-                  <Send className="w-4 h-4 ml-0.5" />
-                </button>
-             </form>
+            {profile?.is_banned ? (
+               <div className="max-w-4xl mx-auto bg-red-500/10 border border-red-500/20 text-red-500 text-sm font-bold p-4 rounded-xl flex items-center justify-center gap-2 text-center">
+                  <Ban className="w-5 h-5 shrink-0" />
+                  You have been restricted from the community for violating rules.
+               </div>
+            ) : (
+               <form onSubmit={handleSendMessage} className="max-w-4xl mx-auto relative flex items-center">
+                  <input 
+                    type="text"
+                    placeholder={`Message as ${profile?.username}...`}
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    className="w-full bg-theme-muted/30 border border-theme-border rounded-full py-3.5 pl-6 pr-14 text-sm focus:outline-none focus:border-theme-accent-end transition-all text-theme-text"
+                  />
+                  <button 
+                    type="submit"
+                    disabled={!newMessage.trim()}
+                    className="absolute right-2 p-2 bg-theme-accent-end text-white rounded-full disabled:opacity-50 hover:scale-105 transition-transform"
+                  >
+                    <Send className="w-4 h-4 ml-0.5" />
+                  </button>
+               </form>
+            )}
           </footer>
         </>
       )}
