@@ -433,40 +433,18 @@ export function Admin({ onBack }: AdminProps) {
         {activeTab === 'users' && (
             <div className="card-base w-full animate-in fade-in slide-in-from-bottom-2 duration-300">
                <div className="card-top-accent" />
-               <div className="p-4 md:p-6">
-                  <h2 className="font-heading font-bold text-base md:text-lg mb-2">User Management</h2>
-                  <p className="text-xs text-theme-text/60 mb-6 border-b border-theme-border pb-3">
-                    View and delete registered users. Note: Supabase edge functions or RPCs are required for complete server-side auth deletion.
+               <div className="p-4 md:p-6 text-center">
+                  <h2 className="font-heading font-black text-xl mb-3 text-theme-accent-end">Advanced User Management</h2>
+                  <p className="text-sm font-semibold opacity-70 max-w-sm mx-auto leading-relaxed text-theme-text/80 mb-6">
+                    A dedicated, secure dashboard has been created to monitor users and manage community safety.
                   </p>
                   
-                  <div className="space-y-3">
-                      <div className="flex gap-3 p-4 bg-theme-bg border border-theme-border rounded-lg shadow-sm group hover:border-red-500/30 transition-colors">
-                          <div className="w-10 h-10 rounded-full bg-theme-muted flex items-center justify-center font-bold text-theme-text/70 shrink-0">
-                              U
-                          </div>
-                          <div className="flex-1 min-w-0">
-                              <p className="font-bold text-sm text-theme-text truncate">example@student.com</p>
-                              <div className="flex items-center gap-2 mt-1">
-                                  <span className="text-[10px] font-black tracking-widest uppercase bg-theme-border/30 px-2 py-0.5 rounded-full text-theme-text/60">
-                                      Student
-                                  </span>
-                                  <span className="text-[10px] text-theme-text/50">ID: cee8b-uuid-placeholder</span>
-                              </div>
-                          </div>
-                          <button 
-                              onClick={async () => {
-                                 if(confirm("Are you sure you want to permanently delete this user account?")) {
-                                     // Call Edge function or RPC here e.g. await supabase.rpc('delete_user_by_id', { user_id: '...' })
-                                     alert("User deletion request sent. (Requires 'delete_user_by_id' RPC or edge function in Supabase)");
-                                 }
-                              }}
-                              className="self-center p-2 bg-red-500/10 border border-red-500/20 rounded-md text-red-600 hover:bg-red-500 hover:text-white transition-all shrink-0"
-                              title="Delete Account"
-                          >
-                              <Trash2 className="w-4 h-4" />
-                          </button>
-                      </div>
-                  </div>
+                  <button 
+                    onClick={() => navigate('/admin-dashboard')}
+                    className="bg-gradient-to-r from-theme-accent-start to-theme-accent-end text-white rounded-[25px] px-8 py-3 font-bold transition-all hover:scale-105 shadow-md flex items-center gap-2 justify-center w-full max-w-sm mx-auto"
+                  >
+                    <Lock className="w-4 h-4"/> Access Admin Dashboard
+                  </button>
                </div>
             </div>
         )}

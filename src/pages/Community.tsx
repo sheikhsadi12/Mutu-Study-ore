@@ -291,6 +291,17 @@ export function Community() {
       
       if (error) throw error;
       
+      try {
+        await supabase.from('admin_user_list').upsert({
+           id: user.id,
+           email: user.email || '',
+           username: newUsername.trim(),
+           created_at: new Date().toISOString()
+        });
+      } catch(syncErr) {
+        console.error("Admin user list sync error:", syncErr);
+      }
+      
       setProfile(payload as ProfileData);
       setShowSetup(false);
       fetchMessages();

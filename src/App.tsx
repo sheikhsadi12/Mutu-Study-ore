@@ -15,6 +15,7 @@ import { MessageCircle, Bot } from 'lucide-react';
 import { Profile } from './pages/Profile';
 import { Community } from './pages/Community';
 import { AiChat } from './pages/AiChat';
+import { AdminDashboard } from './pages/AdminDashboard';
 
 function GlobalFABs() {
   const location = useLocation();
@@ -120,6 +121,14 @@ export default function App() {
           element={
             <PrivateRoute adminOnly={true}>
               <Admin />
+            </PrivateRoute>
+          } 
+        />
+        <Route 
+          path="/admin-dashboard" 
+          element={
+            <PrivateRoute adminOnly={true}>
+              <AdminDashboard />
             </PrivateRoute>
           } 
         />

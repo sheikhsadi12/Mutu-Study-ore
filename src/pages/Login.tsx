@@ -16,8 +16,20 @@ export function Login() {
   const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
-    supabase.auth.onAuthStateChange((event, session) => {
+    supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
+        // Sync to admin_user_list when user logs in
+        try {
+           await supabase.from('admin_user_list').upsert({
+              id: session.user.id,
+              email: session.user.email || '',
+              username: session.user.user_metadata?.username || 'New User',
+              created_at: session.user.created_at || new Date().toISOString()
+           });
+        } catch(syncErr) {
+           console.error("Admin user list sync error on login:", syncErr);
+        }
+        
         navigate(from, { replace: true });
       }
     });
