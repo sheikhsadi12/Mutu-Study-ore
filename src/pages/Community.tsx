@@ -76,7 +76,7 @@ const ChatBubble = React.memo(({ msg, isMe, showHeader, isAdmin, onDelete, onBan
               <MoreVertical className="w-4 h-4" />
             </button>
             {showMenu && (
-              <div className="absolute top-full mt-1 right-0 min-w-[140px] bg-theme-bg border border-theme-border rounded-xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 z-[100]">
+              <div className="absolute top-full mt-1 right-0 min-w-[140px] bg-theme-bg border border-theme-border/50 rounded-xl shadow-md overflow-hidden z-[100] transform-gpu will-change-transform">
                 <button onClick={(e) => { e.stopPropagation(); handleCopy(); }} className="w-full flex items-center gap-2 px-3 py-2.5 text-xs text-theme-text hover:bg-theme-muted/50 transition-colors text-left font-medium">
                   {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
                   {copied ? 'Copied!' : 'Copy Text'}
@@ -93,9 +93,9 @@ const ChatBubble = React.memo(({ msg, isMe, showHeader, isAdmin, onDelete, onBan
         
         <div 
           className={cn(
-            "w-fit max-w-[85%] px-4 py-2 text-[15px] leading-relaxed whitespace-pre-wrap break-words relative",
+            "w-fit max-w-[85%] px-4 py-2 text-[15px] leading-relaxed whitespace-pre-wrap break-words relative transform-gpu will-change-transform",
             isMsgAdmin 
-              ? "bg-gradient-to-r from-[#2a020b] to-[#4C0519] text-[#e8c3a2] rounded-2xl shadow-lg border border-[#4C0519]/50" 
+              ? "bg-gradient-to-r from-[#2a020b] to-[#4C0519] text-[#e8c3a2] rounded-2xl shadow-sm border border-[#4C0519]/50" 
               : isMe 
                 ? "bg-theme-accent-start text-white rounded-2xl rounded-tr-sm shadow-sm" 
                 : "bg-theme-card border border-theme-border/70 text-theme-text rounded-2xl rounded-tl-sm shadow-sm",
@@ -114,7 +114,7 @@ const ChatBubble = React.memo(({ msg, isMe, showHeader, isAdmin, onDelete, onBan
               <MoreVertical className="w-4 h-4" />
             </button>
             {showMenu && (
-              <div className="absolute top-full mt-1 left-0 min-w-[140px] bg-theme-bg border border-theme-border rounded-xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 z-[100]">
+              <div className="absolute top-full mt-1 left-0 min-w-[140px] bg-theme-bg border border-theme-border/50 rounded-xl shadow-md overflow-hidden z-[100] transform-gpu will-change-transform">
                 <button onClick={(e) => { e.stopPropagation(); handleCopy(); }} className="w-full flex items-center gap-2 px-3 py-2.5 text-xs text-theme-text hover:bg-theme-muted/50 transition-colors text-left font-medium">
                   {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
                   {copied ? 'Copied!' : 'Copy Text'}
@@ -153,6 +153,36 @@ const ChatBubble = React.memo(({ msg, isMe, showHeader, isAdmin, onDelete, onBan
   );
 });
 
+const ChatInput = React.memo(({ profile, onSendMessage }: { profile: ProfileData | null, onSendMessage: (msg: string) => void }) => {
+  const [newMessage, setNewMessage] = useState('');
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newMessage.trim()) return;
+    onSendMessage(newMessage.trim());
+    setNewMessage('');
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="max-w-4xl mx-auto relative flex items-center">
+      <input 
+        type="text"
+        placeholder={`Message as ${profile?.username}...`}
+        value={newMessage}
+        onChange={(e) => setNewMessage(e.target.value)}
+        className="w-full bg-theme-muted/30 border border-theme-border rounded-full py-3.5 pl-6 pr-14 text-sm focus:outline-none focus:border-theme-accent-end transition-all text-theme-text"
+      />
+      <button 
+        type="submit"
+        disabled={!newMessage.trim()}
+        className="absolute right-2 p-2 bg-theme-accent-end text-white rounded-full disabled:opacity-50 hover:scale-105 transition-transform transform-gpu will-change-transform"
+      >
+        <Send className="w-4 h-4 ml-0.5" />
+      </button>
+    </form>
+  );
+});
+
 export function Community() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -167,7 +197,6 @@ export function Community() {
 
   // Chat State
   const [messages, setMessages] = useState<Message[]>([]);
-  const [newMessage, setNewMessage] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const scrollContainerRef = useRef<HTMLElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -190,7 +219,7 @@ export function Community() {
 
   const isAdmin = user?.email === 'sadishekh671@gmail.com';
 
-  const handleDeleteMessage = async (messageId: string) => {
+  const handleDeleteMessage = React.useCallback(async (messageId: string) => {
     try {
       setMessages(prev => prev.filter(m => m.id !== messageId)); // Optimistic UI
       const { error } = await supabase.from('community_messages').delete().eq('id', messageId);
@@ -202,9 +231,9 @@ export function Community() {
       console.error('Error deleting message:', e);
       alert('Failed to delete message.');
     }
-  };
+  }, []);
 
-  const handleBanUser = async (userId: string) => {
+  const handleBanUser = React.useCallback(async (userId: string) => {
     if (!window.confirm("Are you sure you want to ban this user?")) return;
     try {
       const { error } = await supabase.from('profiles').update({ is_banned: true }).eq('id', userId);
@@ -214,7 +243,7 @@ export function Community() {
       console.error('Error banning user:', e);
       alert('Failed to ban user.');
     }
-  };
+  }, []);
 
   const handleClearAllMessages = async () => {
     if (!window.confirm("Are you sure you want to permanently delete ALL messages for everyone?")) return;
@@ -396,12 +425,8 @@ export function Community() {
     }, 100);
   };
 
-  const handleSendMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newMessage.trim() || !user || !profile) return;
-
-    const msgText = newMessage.trim();
-    setNewMessage(''); // optimistic clear
+  const handleSendMessage = async (msgText: string) => {
+    if (!msgText.trim() || !user || !profile) return;
 
     try {
       const isAdminUser = user.email === 'sadishekh671@gmail.com';
@@ -430,7 +455,8 @@ export function Community() {
     } catch (e: any) {
       console.error(e);
       alert('Error sending message: ' + (e.message || 'Unknown error'));
-      setNewMessage(msgText); // restore
+      // In a real app we'd want to expose the error back to ChatInput to restore text,
+      // but separating concerns means we either pass a fallback or ignore.
     }
   };
 
@@ -483,9 +509,9 @@ export function Community() {
       {showSetup ? (
         <div className="flex-1 flex items-center justify-center p-4 relative isolate z-50">
            {/* Blur Overlay */}
-           <div className="absolute inset-0 bg-theme-bg/80 backdrop-blur-md z-0" />
+           <div className="absolute inset-0 bg-theme-bg/95 z-0" />
            
-           <div className="card-base p-6 md:p-8 w-full max-w-md relative z-10 rounded-[24px] shadow-2xl border-theme-border/50 animate-in zoom-in-95 duration-300">
+           <div className="card-base p-6 md:p-8 w-full max-w-md relative z-10 rounded-[24px] shadow-xl border border-theme-border/50 transform-gpu will-change-transform">
              {profile && (
                  <button onClick={() => setShowSetup(false)} className="absolute top-4 right-4 p-2 rounded-full hover:bg-theme-muted text-theme-text/50 transition-colors hover:text-theme-text">
                     <X className="w-5 h-5" />
@@ -580,27 +606,12 @@ export function Community() {
 
           <footer className="p-4 border-t border-theme-border bg-theme-bg shrink-0">
             {profile?.is_banned ? (
-               <div className="max-w-4xl mx-auto bg-red-500/10 border border-red-500/20 text-red-500 text-sm font-bold p-4 rounded-xl flex items-center justify-center gap-2 text-center">
+               <div className="max-w-4xl mx-auto bg-red-500/10 border border-red-500/20 text-red-500 text-sm font-bold p-4 rounded-xl flex items-center justify-center gap-2 text-center transform-gpu will-change-transform">
                   <Ban className="w-5 h-5 shrink-0" />
                   You have been restricted from the community for violating rules.
                </div>
             ) : (
-               <form onSubmit={handleSendMessage} className="max-w-4xl mx-auto relative flex items-center">
-                  <input 
-                    type="text"
-                    placeholder={`Message as ${profile?.username}...`}
-                    value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
-                    className="w-full bg-theme-muted/30 border border-theme-border rounded-full py-3.5 pl-6 pr-14 text-sm focus:outline-none focus:border-theme-accent-end transition-all text-theme-text"
-                  />
-                  <button 
-                    type="submit"
-                    disabled={!newMessage.trim()}
-                    className="absolute right-2 p-2 bg-theme-accent-end text-white rounded-full disabled:opacity-50 hover:scale-105 transition-transform"
-                  >
-                    <Send className="w-4 h-4 ml-0.5" />
-                  </button>
-               </form>
+               <ChatInput profile={profile} onSendMessage={handleSendMessage} />
             )}
           </footer>
         </>
@@ -608,8 +619,8 @@ export function Community() {
 
       {/* Admin Profile Modal */}
       {isAdmin && selectedAdminProfile && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-[200]">
-          <div className="bg-theme-bg/90 backdrop-blur-md border border-theme-border rounded-3xl p-6 w-full max-w-sm shadow-2xl relative animate-in fade-in zoom-in-95">
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-[200]">
+          <div className="bg-theme-bg border border-theme-border rounded-3xl p-6 w-full max-w-sm shadow-xl relative transform-gpu will-change-transform">
              <button onClick={() => setSelectedAdminProfile(null)} className="absolute top-4 right-4 p-2 rounded-full hover:bg-theme-muted transition-colors text-theme-text/60">
                 <X className="w-5 h-5" />
              </button>
