@@ -1,22 +1,34 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Sparkles, X, Send, Bot, Loader2, Plus, FileText, CheckCircle2 } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { Note } from '../types';
 import { cn } from '../lib/utils';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import 'katex/dist/katex.min.css';
 
 interface ChatComponentProps {
   currentNote?: Note | null;
 }
 
+interface AiMessage {
+  role: 'user' | 'model';
+  content: string;
+}
+
 export function ChatComponent({ currentNote }: ChatComponentProps) {
   const [aiQuery, setAiQuery] = useState('');
-  const [aiResponse, setAiResponse] = useState('');
+  const [messages, setMessages] = useState<AiMessage[]>([]);
   const [isAiLoading, setIsAiLoading] = useState(false);
   const systemKey = import.meta.env.VITE_GEMINI_API_KEY;
   const [localApiKey, setLocalApiKey] = useState(() => localStorage.getItem('mutu_user_gemini_key') || '');
   const [showSetupGuide, setShowSetupGuide] = useState(!systemKey && !localApiKey);
   
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
   // Attachments State
   const [showAttachMenu, setShowAttachMenu] = useState(false);
   const [allNotes, setAllNotes] = useState<Note[]>([]);
@@ -42,6 +54,10 @@ export function ChatComponent({ currentNote }: ChatComponentProps) {
     }
   }, [allNotes.length]);
 
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, isAiLoading]);
+
   const saveApiKey = (key: string) => {
     if (!key.trim()) return;
     setLocalApiKey(key);
@@ -63,7 +79,7 @@ export function ChatComponent({ currentNote }: ChatComponentProps) {
 
   const handleAiSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!aiQuery.trim()) return;
+    if (!aiQuery.trim() || isAiLoading) return;
 
     const apiKey = systemKey || localApiKey;
     
@@ -72,40 +88,67 @@ export function ChatComponent({ currentNote }: ChatComponentProps) {
       return;
     }
 
+    const currentQuery = aiQuery.trim();
+    setAiQuery('');
+    setMessages(prev => [...prev, { role: 'user', content: currentQuery }, { role: 'model', content: '' }]);
     setIsAiLoading(true);
-    setAiResponse('');
     setShowAttachMenu(false);
 
     try {
       const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
       
       let contextText = "";
-      if (attachedNoteIds.size > 0) {
-        // Fetch full HTML content for just the attached notes securely here
+      if (attachedNoteIds.size > 0 && messages.length === 0) {
+        // Fetch full HTML content for just the attached notes securely here (only inject on first message to save tokens)
         const idsArray = Array.from(attachedNoteIds);
-        const { data: attachedNotesData, error } = await supabase.from('notes').select('title, html_code').in('id', idsArray);
+        const { data: attachedNotesData } = await supabase.from('notes').select('title, html_code').in('id', idsArray);
         
         if (attachedNotesData) {
            contextText = attachedNotesData.map(n => `--- Module: ${n.title} ---\n${n.html_code?.substring(0, 5000)}`).join('\n\n');
         }
       }
 
-      let prompt = "";
-      if (contextText) {
-         prompt = `Context from attached notes:\n${contextText}\n\nUser Question: ${aiQuery}\n\nPlease answer based strictly on the provided notes.`;
-      } else {
-         prompt = `User Question: ${aiQuery}\n\nPlease act as a helpful and knowledgeable general-purpose study assistant.`;
-      }
+      const systemInstruction = contextText 
+        ? `Context from attached notes:\n${contextText}\n\nPlease act as a helpful and knowledgeable general-purpose study assistant, answering strictly based on the provided notes.` 
+        : `Please act as a helpful and knowledgeable general-purpose study assistant.`;
+
+      const model = genAI.getGenerativeModel({ 
+        model: "gemini-3.5-flash",
+        systemInstruction
+      });
       
-      const result = await model.generateContent(prompt);
-      setAiResponse(result.response.text());
+      const chat = model.startChat({
+        history: messages.map(m => ({
+          role: m.role,
+          parts: [{ text: m.content }]
+        }))
+      });
+      
+      const result = await chat.sendMessageStream(currentQuery);
+      let isFirstChunk = true;
+
+      for await (const chunk of result.stream) {
+        if (isFirstChunk) {
+          setIsAiLoading(false);
+          isFirstChunk = false;
+        }
+        const chunkText = chunk.text();
+        setMessages(prev => {
+          const newMessages = [...prev];
+          newMessages[newMessages.length - 1].content += chunkText;
+          return newMessages;
+        });
+      }
     } catch (e: any) {
       console.error(e);
       if (e?.message?.includes('API key not valid') || e?.message?.includes('quota') || e?.status === 403 || e?.status === 429) {
           setShowSetupGuide(true);
       } else {
-          setAiResponse('AI Error: ' + (e?.message || 'Failed to fetch response.'));
+          setMessages(prev => {
+            const newMessages = [...prev];
+            newMessages[newMessages.length - 1].content = 'AI Error: ' + (e?.message || 'Failed to fetch response.');
+            return newMessages;
+          });
       }
     } finally {
       setIsAiLoading(false);
@@ -166,20 +209,50 @@ export function ChatComponent({ currentNote }: ChatComponentProps) {
         </div>
       ) : (
         <>
-          <div className="flex-1 p-4 overflow-y-auto w-full text-sm text-theme-text/80 space-y-4">
-            {aiResponse ? (
-              <div className="leading-relaxed whitespace-pre-wrap font-sans">{aiResponse}</div>
-            ) : (
+          <div className="flex-1 p-4 overflow-y-auto w-full text-sm text-theme-text/80 space-y-6">
+            {messages.length === 0 ? (
               <div className="opacity-60 text-center h-full flex flex-col items-center justify-center italic gap-3">
                 <Bot className="w-12 h-12 opacity-50" />
                 <p>Ask a question based on your materials.<br/>Attach specific notes to guide my context.</p>
               </div>
+            ) : (
+              messages.map((msg, idx) => {
+                if (msg.role === 'model' && !msg.content && isAiLoading) return null; // hide empty bot message until streaming starts
+                return (
+                 <div key={idx} className={cn("flex flex-col w-full relative", msg.role === 'user' ? "items-end" : "items-start")}>
+                    <div className={cn("flex items-end gap-1.5 w-full", msg.role === 'user' ? "justify-end" : "justify-start")}>
+                       <div 
+                         className={cn(
+                           "w-fit max-w-[90%] md:max-w-[85%] px-4 py-3 break-words relative transform-gpu",
+                           msg.role === 'user' 
+                             ? "bg-theme-accent-start text-white shadow-sm rounded-[24px] rounded-br-[8px]" 
+                             : "bg-theme-card border border-theme-border/70 text-theme-text shadow-sm rounded-[24px] rounded-bl-[8px]"
+                         )}
+                       >
+                          {msg.role === 'model' ? (
+                             <div className="prose dark:prose-invert prose-mahogany max-w-none text-[15px] leading-relaxed prose-p:my-2 prose-pre:bg-theme-muted/50 prose-pre:border prose-pre:border-theme-border/50 prose-pre:my-2 prose-pre:text-theme-text">
+                               <ReactMarkdown 
+                                  remarkPlugins={[remarkGfm, remarkMath]} 
+                                  rehypePlugins={[rehypeKatex]}
+                               >
+                                 {msg.content}
+                               </ReactMarkdown>
+                             </div>
+                          ) : (
+                             <div className="whitespace-pre-wrap text-[15px]">{msg.content}</div>
+                          )}
+                       </div>
+                    </div>
+                 </div>
+                )
+              })
             )}
             {isAiLoading && (
               <div className="flex items-center gap-2 text-theme-accent-end font-bold animate-pulse">
-                <Loader2 className="w-5 h-5 animate-spin" /> Analyzing context...
+                <Loader2 className="w-5 h-5 animate-spin" /> Thinking...
               </div>
             )}
+            <div ref={messagesEndRef} />
           </div>
 
           {/* Attachments Menu Overlay */}
@@ -226,37 +299,50 @@ export function ChatComponent({ currentNote }: ChatComponentProps) {
                     <span key={id} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-theme-border text-[10px] whitespace-nowrap text-theme-text/80 font-medium">
                       <FileText className="w-3 h-3" />
                       {n.title.substring(0, 15)}{n.title.length > 15 ? '...' : ''}
-                      <button onClick={() => toggleAttachment(id)} className="ml-1 hover:text-red-500 rounded-full p-0.5"><X className="w-3 h-3"/></button>
+                      <button type="button" onClick={() => toggleAttachment(id)} className="ml-1 hover:text-red-500 rounded-full p-0.5"><X className="w-3 h-3"/></button>
                     </span>
                   );
                 })}
               </div>
            )}
 
-          <form onSubmit={handleAiSubmit} className="p-3 border-t border-theme-border bg-theme-bg flex items-center gap-2 shrink-0">
+          <form onSubmit={handleAiSubmit} className="p-3 py-4 border-t border-theme-border bg-theme-bg flex items-end gap-2 shrink-0 relative z-20">
             <button
               type="button"
               onClick={() => setShowAttachMenu(!showAttachMenu)}
-              className={`p-2 rounded-xl transition-all border shrink-0 ${showAttachMenu || attachedNoteIds.size > 0 ? 'bg-theme-accent-start text-white border-theme-accent-start shadow-sm' : 'bg-theme-muted/50 text-theme-text/60 border-theme-border/50 hover:bg-theme-border hover:text-theme-text'}`}
+              className={`p-3 rounded-2xl transition-all border shrink-0 ${showAttachMenu || attachedNoteIds.size > 0 ? 'bg-theme-accent-start text-white border-theme-accent-start shadow-sm' : 'bg-theme-muted/50 text-theme-text/60 border-theme-border/50 hover:bg-theme-border hover:text-theme-text'}`}
               title="Attach Study Material"
             >
               <Plus className="w-5 h-5" />
             </button>
-            <input
-              type="text"
-              placeholder="Ask about your notes..."
-              value={aiQuery}
-              onChange={(e) => setAiQuery(e.target.value)}
-              disabled={isAiLoading}
-              className="flex-1 bg-theme-muted/20 border border-theme-border/80 rounded-xl px-4 text-sm outline-none focus:border-theme-accent-end py-2.5 placeholder:text-theme-text/40 transition-colors"
-            />
-            <button 
-              type="submit" 
-              disabled={isAiLoading || !aiQuery.trim()}
-              className="bg-theme-accent-end text-white p-2.5 rounded-xl disabled:opacity-50 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 transition-all shrink-0"
-            >
-              <Send className="w-5 h-5" />
-            </button>
+            <div className="relative flex-1">
+              <textarea
+                rows={1}
+                placeholder="Ask about your notes..."
+                value={aiQuery}
+                onChange={(e) => {
+                  setAiQuery(e.target.value);
+                  e.target.style.height = 'auto';
+                  e.target.style.height = `${Math.min(e.target.scrollHeight, 160)}px`;
+                }}
+                disabled={isAiLoading && messages.length > 0 && !messages[messages.length-1].content} // disable only initially
+                className="w-full bg-transparent border border-theme-border/80 rounded-[24px] px-5 text-[15px] outline-none focus:border-theme-accent-end py-[12px] pr-[50px] placeholder:text-theme-text/40 transition-colors resize-none overflow-hidden block"
+                style={{ minHeight: '48px', maxHeight: '160px' }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleAiSubmit(e as any);
+                  }
+                }}
+              />
+              <button 
+                type="submit" 
+                disabled={isAiLoading || !aiQuery.trim()}
+                className="absolute right-1.5 bottom-[4px] bg-theme-accent-end text-white w-10 h-10 flex items-center justify-center rounded-full disabled:opacity-50 hover:shadow-md hover:scale-105 active:scale-95 transition-all shrink-0"
+              >
+                <Send className="w-4 h-4 -ml-0.5 mt-0.5" />
+              </button>
+            </div>
           </form>
         </>
       )}

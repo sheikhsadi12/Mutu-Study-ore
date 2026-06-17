@@ -24,6 +24,7 @@ export function AdminDashboard() {
   const navigate = useNavigate();
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [systemControls, setSystemControls] = useState<SystemControls>({
     id: 1,
@@ -45,12 +46,16 @@ export function AdminDashboard() {
 
     const loadInitialData = async () => {
       setLoading(true);
+      setError(null);
       try {
         const { data: profiles, error: profilesError } = await supabase
           .from('profiles')
-          .select('*');
+          .select('id, email, full_name, avatar_url, created_at, is_admin, is_banned')
+          .order('created_at', { ascending: false });
 
-        if (profilesError) throw profilesError;
+        if (profilesError) {
+          throw profilesError;
+        }
 
         if (profiles && profiles.length > 0) {
           const mapped: AdminUser[] = profiles.map((p) => ({
@@ -63,19 +68,13 @@ export function AdminDashboard() {
             created_at: p.created_at || undefined,
           }));
 
-          mapped.sort((a, b) => {
-             if (a.created_at && b.created_at) {
-                return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-             }
-             return 0;
-          });
-
           if (isMounted) setUsers(mapped);
         } else {
           if (isMounted) setUsers([]);
         }
       } catch (e: any) {
-        console.error('Error fetching admin dashboard users:', e);
+        console.error('Supabase Fetch Error:', e.message);
+        if (isMounted) setError(e.message || 'Failed to load users');
       } finally {
         if (isMounted) setLoading(false);
       }
@@ -116,7 +115,7 @@ export function AdminDashboard() {
           const newProfile = payload.new;
           const newUser: AdminUser = {
             id: newProfile.id,
-            full_name: newProfile.full_name || 'New User',
+            full_name: newProfile.full_name || 'Unknown Student',
             email: newProfile.email || '',
             avatar_url: newProfile.avatar_url,
             created_at: newProfile.created_at || new Date().toISOString(),
@@ -396,7 +395,7 @@ export function AdminDashboard() {
         </div>
         )}
 
-        <div className="flex flex-col md:flex-row items-center gap-6 justify-between bg-theme-card border border-theme-border p-6 rounded-[24px] shadow-sm">
+        <div className="flex flex-col md:flex-row items-center gap-6 justify-between bg-theme-card border border-theme-border p-6 rounded-[24px] shadow-sm mb-6">
            <div className="flex items-center gap-4 text-theme-text">
               <div className="w-14 h-14 rounded-full bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
                  <Users className="w-7 h-7 text-blue-500" />
@@ -419,13 +418,20 @@ export function AdminDashboard() {
            </div>
         </div>
 
+        {error && (
+          <div className="bg-red-500/10 border border-red-500 flex items-center justify-center text-red-500 p-4 rounded-xl gap-3 font-semibold mb-6">
+            <AlertTriangle className="w-5 h-5" />
+            Failed to load users: {error}
+          </div>
+        )}
+
         <div className="bg-theme-card border border-theme-border rounded-[24px] shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-theme-border bg-theme-muted/20">
                   <th className="p-4 text-xs font-bold text-theme-text/50 uppercase tracking-wider">User</th>
-                  <th className="p-4 text-xs font-bold text-theme-text/50 uppercase tracking-wider">Email (Real Identity)</th>
+                  <th className="p-4 text-xs font-bold text-theme-text/50 uppercase tracking-wider">User ID</th>
                   <th className="p-4 text-xs font-bold text-theme-text/50 uppercase tracking-wider">Join Date</th>
                   <th className="p-4 text-xs font-bold text-theme-text/50 uppercase tracking-wider">Status</th>
                   {currentUserEmail === 'sadishekh671@gmail.com' && (
@@ -456,16 +462,18 @@ export function AdminDashboard() {
                       <td className="p-4">
                         <div className="flex items-center gap-3">
                           <img 
-                            src={user.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.full_name || 'User')}&background=random`} 
-                            alt={user.full_name || 'User'} 
+                            src={user.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.full_name || 'Unknown Student')}&background=random`} 
+                            alt={user.full_name || 'Unknown Student'} 
                             className="w-10 h-10 rounded-full border border-theme-border object-cover"
                           />
-                          <div className="font-bold text-theme-text">{user.full_name || 'No Name'}</div>
+                          <div>
+                            <div className="font-bold text-theme-text">{user.full_name || 'Unknown Student'}</div>
+                            <div className="text-sm text-theme-text/70">{user.email || 'N/A'}</div>
+                          </div>
                         </div>
                       </td>
                       <td className="p-4">
-                        <div className="font-mono text-sm text-theme-text">{user.email || 'N/A'}</div>
-                        <div className="text-[10px] text-theme-text/40 font-mono mt-1 break-all">{user.id}</div>
+                        <div className="text-[10px] text-theme-text/40 font-mono break-all">{user.id}</div>
                       </td>
                       <td className="p-4 text-sm text-theme-text/70 uppercase">
                         {user.created_at ? new Date(user.created_at).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }) : 'Unknown'}
