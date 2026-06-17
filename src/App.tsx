@@ -19,9 +19,16 @@ import { AdminDashboard } from './pages/AdminDashboard';
 
 import { PWAManager } from './components/PWAManager';
 import { SplashScreen } from './components/SplashScreen';
+import { useAndroidBackButton } from './hooks/useHardwareBack';
+
+function AndroidBackButtonInterceptor() {
+  useAndroidBackButton();
+  return null;
+}
 
 function GlobalFABs() {
   const location = useLocation();
+
   const navigate = useNavigate();
   
   if (location.pathname !== '/') return null;
@@ -124,6 +131,7 @@ export default function App() {
     <>
       {showSplash && <SplashScreen onFinish={() => setShowSplash(false)} />}
       <BrowserRouter>
+        <AndroidBackButtonInterceptor />
         <PWAManager />
         <GlobalFABs />
         <Routes>
