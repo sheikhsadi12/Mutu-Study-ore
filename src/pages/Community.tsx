@@ -10,6 +10,7 @@ interface ProfileData {
   username: string;
   avatar_url: string;
   is_banned?: boolean;
+  suspended_until?: string | null;
 }
 
 interface Message {
@@ -304,7 +305,7 @@ export function Community() {
       if (data && data.username) {
         setProfile(data);
         fetchMessages();
-        setupRealtimeSubscription();
+        setupRealtimeSubscription(userId);
         
         // If coming from Profile page settings
         const searchParams = new URLSearchParams(location.search);
@@ -348,7 +349,7 @@ export function Community() {
       setProfile(payload as ProfileData);
       setShowSetup(false);
       fetchMessages();
-      setupRealtimeSubscription();
+      setupRealtimeSubscription(user.id);
     } catch (e: any) {
       console.error(e);
       alert('Error saving profile: ' + (e.message || 'Unknown error'));
@@ -379,7 +380,7 @@ export function Community() {
     }
   };
 
-  const setupRealtimeSubscription = () => {
+  const setupRealtimeSubscription = (userId: string) => {
     if (subscriptionRef.current) return;
 
     const channel = supabase
@@ -400,6 +401,15 @@ export function Community() {
         { event: 'DELETE', schema: 'public', table: 'community_messages' },
         (payload) => {
           setMessages(prev => prev.filter(m => m.id !== payload.old.id));
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${userId}` },
+        (payload) => {
+          if (payload.new) {
+             setProfile(payload.new as ProfileData);
+          }
         }
       )
       .subscribe();
@@ -605,7 +615,7 @@ export function Community() {
           </main>
 
           <footer className="p-4 border-t border-theme-border bg-theme-bg shrink-0">
-            {profile?.is_banned ? (
+            {profile?.is_banned || (profile?.suspended_until && new Date(profile.suspended_until) > new Date()) ? (
                <div className="max-w-4xl mx-auto bg-red-500/10 border border-red-500/20 text-red-500 text-sm font-bold p-4 rounded-xl flex items-center justify-center gap-2 text-center transform-gpu will-change-transform">
                   <Ban className="w-5 h-5 shrink-0" />
                   You have been restricted from the community for violating rules.
