@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { ArrowLeft, Send, MessageCircle, User, Loader2, X, Trash2, Ban, MoreVertical, Copy, Check } from 'lucide-react';
+import { ArrowLeft, Send, MessageCircle, User, Loader2, X, Trash2, Ban, MoreVertical, Copy, Check, Clock, CheckCircle } from 'lucide-react';
 import { User as AuthUser } from '@supabase/supabase-js';
 import { cn } from '../lib/utils';
 
@@ -173,6 +173,18 @@ export function Community() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const [selectedAdminProfile, setSelectedAdminProfile] = useState<Message | null>(null);
+  const [adminUserStatus, setAdminUserStatus] = useState<{is_banned: boolean, suspended_until: string | null} | null>(null);
+
+  useEffect(() => {
+    if (user?.email === 'sadishekh671@gmail.com' && selectedAdminProfile) {
+       supabase.from('profiles').select('is_banned, suspended_until').eq('id', selectedAdminProfile.user_id).single()
+         .then(({data}) => {
+            if (data) setAdminUserStatus(data);
+         });
+    } else {
+       setAdminUserStatus(null);
+    }
+  }, [selectedAdminProfile, user?.email]);
 
   const subscriptionRef = useRef<any>(null);
 
@@ -608,31 +620,83 @@ export function Community() {
                 <p className="text-xs text-theme-text/40 font-mono bg-theme-muted px-2 py-1 rounded-md mb-8 select-all">{selectedAdminProfile.user_id}</p>
                 
                 <div className="w-full space-y-3">
-                   <button 
-                      onClick={async () => {
-                         try {
-                           await supabase.from('profiles').update({ is_banned: true }).eq('id', selectedAdminProfile.user_id);
-                           setSelectedAdminProfile(null);
-                           // Force refresh messages so any UI updates happen if necessary, though it won't retroactively hide them without page reload or explicit filtering
-                         } catch (err) { console.error(err); }
-                      }}
-                      className="w-full bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-600 border border-yellow-500/30 rounded-xl py-3 font-bold flex items-center justify-center gap-2 transition-all shadow-sm"
-                   >
-                      <Ban className="w-4 h-4" /> ⏱️ Suspend User
-                   </button>
-                   <button 
-                      onClick={async () => {
-                         if (!confirm("Are you sure you want to permanent kick and wipe their chat history?")) return;
-                         try {
-                           await supabase.from('profiles').update({ is_banned: true }).eq('id', selectedAdminProfile.user_id);
-                           await supabase.from('community_messages').delete().eq('user_id', selectedAdminProfile.user_id);
-                           setSelectedAdminProfile(null);
-                         } catch (err) { console.error(err); }
-                      }}
-                      className="w-full bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/30 rounded-xl py-3 font-bold flex items-center justify-center gap-2 transition-all shadow-sm"
-                   >
-                      <Trash2 className="w-4 h-4" /> 🚫 Permanent Kick & Wipe
-                   </button>
+                   {!adminUserStatus ? (
+                      <div className="flex items-center justify-center py-4 bg-theme-muted/50 rounded-xl text-theme-text/50">
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                      </div>
+                   ) : adminUserStatus.is_banned || (adminUserStatus.suspended_until && new Date(adminUserStatus.suspended_until) > new Date()) ? (
+                      <button 
+                         onClick={async () => {
+                            try {
+                               await supabase.from('profiles').update({ is_banned: false, suspended_until: null }).eq('id', selectedAdminProfile.user_id);
+                               setAdminUserStatus({ is_banned: false, suspended_until: null });
+                            } catch (err) { console.error(err); }
+                         }}
+                         className="w-full bg-green-500/10 hover:bg-green-500/20 text-green-600 border border-green-500/30 rounded-xl py-3 font-bold flex items-center justify-center gap-2 transition-all shadow-sm"
+                      >
+                         <CheckCircle className="w-4 h-4" /> ✅ Lift Ban / Unsuspend
+                      </button>
+                   ) : (
+                      <>
+                         <div className="flex flex-col gap-2 p-3 bg-theme-border/20 rounded-xl border border-theme-border/50">
+                            <div className="flex items-center gap-1.5 px-1 mb-1">
+                               <Clock className="w-3 h-3 text-yellow-600" />
+                               <span className="text-[10px] font-bold text-yellow-600 uppercase tracking-widest">Time-Based Suspension</span>
+                            </div>
+                            <div className="grid grid-cols-3 gap-2">
+                               <button 
+                                  onClick={async () => {
+                                     try {
+                                        const futureTimestamp = new Date(Date.now() + 5 * 60000).toISOString();
+                                        await supabase.from('profiles').update({ suspended_until: futureTimestamp }).eq('id', selectedAdminProfile.user_id);
+                                        setAdminUserStatus({ is_banned: false, suspended_until: futureTimestamp });
+                                     } catch (err) { console.error(err); }
+                                  }}
+                                  className="bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-600 border border-yellow-500/20 rounded-lg py-2 text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-1.5"
+                               >
+                                  5 Mins
+                               </button>
+                               <button 
+                                  onClick={async () => {
+                                     try {
+                                        const futureTimestamp = new Date(Date.now() + 10 * 60000).toISOString();
+                                        await supabase.from('profiles').update({ suspended_until: futureTimestamp }).eq('id', selectedAdminProfile.user_id);
+                                        setAdminUserStatus({ is_banned: false, suspended_until: futureTimestamp });
+                                     } catch (err) { console.error(err); }
+                                  }}
+                                  className="bg-orange-500/10 hover:bg-orange-500/20 text-orange-600 border border-orange-500/20 rounded-lg py-2 text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-1.5"
+                               >
+                                  10 Mins
+                               </button>
+                               <button 
+                                  onClick={async () => {
+                                     try {
+                                        const futureTimestamp = new Date(Date.now() + 60 * 60000).toISOString();
+                                        await supabase.from('profiles').update({ suspended_until: futureTimestamp }).eq('id', selectedAdminProfile.user_id);
+                                        setAdminUserStatus({ is_banned: false, suspended_until: futureTimestamp });
+                                     } catch (err) { console.error(err); }
+                                  }}
+                                  className="bg-red-500/10 hover:bg-red-500/20 text-red-600 border border-red-500/20 rounded-lg py-2 text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-1.5"
+                               >
+                                  1 Hour
+                               </button>
+                            </div>
+                         </div>
+                         <button 
+                            onClick={async () => {
+                               if (!confirm("Are you sure you want to permanent kick and wipe their chat history?")) return;
+                               try {
+                                 await supabase.from('profiles').update({ is_banned: true }).eq('id', selectedAdminProfile.user_id);
+                                 await supabase.from('community_messages').delete().eq('user_id', selectedAdminProfile.user_id);
+                                 setSelectedAdminProfile(null);
+                               } catch (err) { console.error(err); }
+                            }}
+                            className="w-full bg-red-500/10 hover:bg-red-500/20 text-red-600 border border-red-500/30 rounded-xl py-3 font-bold flex items-center justify-center gap-2 transition-all shadow-sm"
+                         >
+                            <Trash2 className="w-4 h-4" /> 🚫 Permanent Kick & Wipe
+                         </button>
+                      </>
+                   )}
                    <button 
                       onClick={() => setSelectedAdminProfile(null)}
                       className="w-full mt-2 text-theme-text/60 hover:text-theme-text/90 font-medium py-2 rounded-xl hover:bg-theme-muted/50 transition-colors"
