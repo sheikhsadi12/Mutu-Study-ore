@@ -6,10 +6,11 @@ import { useNavigate } from 'react-router-dom';
 interface AdminUser {
   id: string;
   email: string;
-  username: string;
+  full_name?: string;
+  avatar_url?: string;
+  is_banned: boolean;
+  is_admin: boolean;
   created_at?: string;
-  is_banned?: boolean;
-  is_admin?: boolean;
 }
 
 interface SystemControls {
@@ -41,12 +42,47 @@ export function AdminDashboard() {
     fetchSystemControls();
 
     const subscription = supabase
-      .channel('admin_user_list_changes')
+      .channel('public:profiles')
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'admin_user_list' },
+        { event: '*', schema: 'public', table: 'profiles' },
         (payload) => {
-          fetchUsers(); // Refresh the list when changes occur
+          if (payload.eventType === 'INSERT') {
+            const newProfile = payload.new;
+            const newUser: AdminUser = {
+              id: newProfile.id,
+              full_name: newProfile.full_name || 'New User',
+              email: newProfile.email || '',
+              avatar_url: newProfile.avatar_url,
+              created_at: newProfile.created_at || new Date().toISOString(),
+              is_banned: newProfile.is_banned || false,
+              is_admin: newProfile.is_admin || false,
+            };
+
+            setUsers((prev) => {
+              if (prev.some((u) => u.id === newProfile.id)) return prev;
+              return [newUser, ...prev];
+            });
+          } else if (payload.eventType === 'UPDATE') {
+            const updatedProfile = payload.new;
+            setUsers((prev) =>
+              prev.map((u) =>
+                u.id === updatedProfile.id
+                  ? {
+                      ...u,
+                      is_banned: updatedProfile.is_banned,
+                      is_admin: updatedProfile.is_admin,
+                      full_name: updatedProfile.full_name || u.full_name,
+                      email: updatedProfile.email || u.email,
+                      avatar_url: updatedProfile.avatar_url || u.avatar_url,
+                    }
+                  : u
+              )
+            );
+          } else if (payload.eventType === 'DELETE') {
+            const deletedProfile = payload.old;
+            setUsers((prev) => prev.filter((u) => u.id !== deletedProfile.id));
+          }
         }
       )
       .subscribe();
@@ -115,44 +151,31 @@ export function AdminDashboard() {
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      // Fetch admin_user_list
-      const { data: adminList, error: adminListError } = await supabase
-        .from('admin_user_list')
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
         .select('*');
 
-      if (adminListError) throw adminListError;
+      if (profilesError) throw profilesError;
 
-      // Extract ids to fetch profile status
-      if (adminList && adminList.length > 0) {
-        const ids = adminList.map((u) => u.id);
-        
-        // Fetch profiles
-        const { data: profiles, error: profilesError } = await supabase
-          .from('profiles')
-          .select('id, is_banned, is_admin')
-          .in('id', ids);
+      if (profiles && profiles.length > 0) {
+        const mapped: AdminUser[] = profiles.map((p) => ({
+          id: p.id,
+          email: p.email || '',
+          full_name: p.full_name,
+          avatar_url: p.avatar_url,
+          is_banned: p.is_banned || false,
+          is_admin: p.is_admin || false,
+          created_at: p.created_at || undefined,
+        }));
 
-        if (profilesError) throw profilesError;
-
-        // Merge
-        const merged: AdminUser[] = adminList.map((adminUser) => {
-          const profile = profiles?.find((p) => p.id === adminUser.id);
-          return {
-            ...adminUser,
-            is_banned: profile?.is_banned || false,
-            is_admin: profile?.is_admin || adminUser.is_admin || false,
-          };
-        });
-
-        // Sort by newest first, assuming created_at exists, otherwise ID
-        merged.sort((a, b) => {
+        mapped.sort((a, b) => {
            if (a.created_at && b.created_at) {
               return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
            }
            return 0;
         });
 
-        setUsers(merged);
+        setUsers(mapped);
       } else {
         setUsers([]);
       }
@@ -168,13 +191,6 @@ export function AdminDashboard() {
     if (!window.confirm(`Are you sure you want to ${currentlyAdmin ? 'remove' : 'make'} this user an admin?`)) return;
 
     try {
-      const { error: adminError } = await supabase
-        .from('admin_user_list')
-        .update({ is_admin: !currentlyAdmin })
-        .eq('id', userId);
-
-      if (adminError) throw adminError;
-
       const { error: profileError } = await supabase
         .from('profiles')
         .update({ is_admin: !currentlyAdmin })
@@ -224,7 +240,7 @@ export function AdminDashboard() {
 
   const filteredUsers = users.filter(u => 
       u.email?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      u.username?.toLowerCase().includes(searchTerm.toLowerCase())
+      u.full_name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -331,7 +347,7 @@ export function AdminDashboard() {
            <div className="relative w-full md:w-80">
               <input 
                  type="text" 
-                 placeholder="Search email or username..." 
+                 placeholder="Search email or full name..." 
                  value={searchTerm}
                  onChange={(e) => setSearchTerm(e.target.value)}
                  className="w-full pl-11 pr-4 py-3 rounded-xl bg-theme-muted/50 border border-theme-border focus:border-theme-accent-end focus:ring-1 focus:ring-theme-accent-end outline-none transition-all text-theme-text"
@@ -345,8 +361,8 @@ export function AdminDashboard() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-theme-border bg-theme-muted/20">
+                  <th className="p-4 text-xs font-bold text-theme-text/50 uppercase tracking-wider">User</th>
                   <th className="p-4 text-xs font-bold text-theme-text/50 uppercase tracking-wider">Email (Real Identity)</th>
-                  <th className="p-4 text-xs font-bold text-theme-text/50 uppercase tracking-wider">Community Nickname</th>
                   <th className="p-4 text-xs font-bold text-theme-text/50 uppercase tracking-wider">Join Date</th>
                   <th className="p-4 text-xs font-bold text-theme-text/50 uppercase tracking-wider">Status</th>
                   {currentUserEmail === 'sadishekh671@gmail.com' && (
@@ -375,11 +391,18 @@ export function AdminDashboard() {
                   filteredUsers.map((user) => (
                     <tr key={user.id} className="border-b last:border-b-0 border-theme-border hover:bg-theme-muted/10 transition-colors">
                       <td className="p-4">
-                        <div className="font-mono text-sm text-theme-text">{user.email || 'N/A'}</div>
-                        <div className="text-[10px] text-theme-text/40 font-mono mt-1 break-all">{user.id}</div>
+                        <div className="flex items-center gap-3">
+                          <img 
+                            src={user.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.full_name || 'User')}&background=random`} 
+                            alt={user.full_name || 'User'} 
+                            className="w-10 h-10 rounded-full border border-theme-border object-cover"
+                          />
+                          <div className="font-bold text-theme-text">{user.full_name || 'No Name'}</div>
+                        </div>
                       </td>
                       <td className="p-4">
-                        <div className="font-bold text-theme-text">{user.username}</div>
+                        <div className="font-mono text-sm text-theme-text">{user.email || 'N/A'}</div>
+                        <div className="text-[10px] text-theme-text/40 font-mono mt-1 break-all">{user.id}</div>
                       </td>
                       <td className="p-4 text-sm text-theme-text/70 uppercase">
                         {user.created_at ? new Date(user.created_at).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }) : 'Unknown'}
