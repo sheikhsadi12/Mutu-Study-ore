@@ -16,20 +16,20 @@ export function SplashScreen({ onFinish }: { onFinish: () => void }) {
 
   return (
     <div 
-      className={`fixed top-0 left-0 w-screen h-screen flex flex-col items-center justify-center bg-[#050000] z-[9999] transition-opacity duration-700 ease-in-out ${fading ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+      className={`fixed top-0 left-0 w-screen h-screen flex flex-col items-center justify-center bg-theme-bg z-[9999] transition-opacity duration-700 ease-in-out ${fading ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
     >
       {/* Circle Emblem with golden text and pulse effect */}
-      <div className="w-24 h-24 rounded-full flex items-center justify-center bg-gradient-to-br from-[#4C0519] to-[#2a020b] border border-[#e8c3a2]/30 shadow-[0_0_30px_rgba(232,195,162,0.15)] animate-pulse">
-        <span className="text-5xl font-serif text-[#e8c3a2]">M</span>
+      <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full flex items-center justify-center bg-gradient-to-br from-theme-accent-start to-theme-accent-end border border-theme-border/30 dark:shadow-[0_0_30px_rgba(232,195,162,0.05)] shadow-xl animate-pulse mb-6">
+        <span className="text-6xl sm:text-7xl font-heading text-white">M</span>
       </div>
       
       {/* Premium Typography */}
-      <h1 className="mt-6 text-xl font-sans tracking-[0.3em] text-[#e8c3a2]/90 font-medium">
-        MUTU STUDY
+      <h1 className="text-2xl sm:text-3xl font-heading tracking-[0.2em] sm:tracking-[0.3em] text-theme-text font-bold uppercase">
+        Mutu Study
       </h1>
       
       {/* Subtitle */}
-      <p className="text-xs tracking-widest text-white/40 mt-2 uppercase">
+      <p className="text-[10px] sm:text-xs tracking-[0.3em] text-theme-text/50 mt-3 sm:mt-4 font-sans uppercase font-medium">
         End-to-End Anonymous
       </p>
     </div>
