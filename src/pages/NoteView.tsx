@@ -16,7 +16,7 @@ interface NoteViewProps {
 }
 
 export function NoteView({ note, onBack, isDarkMode = false }: NoteViewProps) {
-  const [fullNote, setFullNote] = useState<Note | null>(null);
+  const [fullNote, setFullNote] = useState<Note | null>(note);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -31,6 +31,10 @@ export function NoteView({ note, onBack, isDarkMode = false }: NoteViewProps) {
   }, []);
 
   useEffect(() => {
+    if (note.html_code) {
+      setFullNote(note);
+      return;
+    }
     const fetchNote = async () => {
       const { data, error } = await supabase
         .from("notes")
@@ -40,7 +44,7 @@ export function NoteView({ note, onBack, isDarkMode = false }: NoteViewProps) {
       if (data && !error) setFullNote(data as Note);
     };
     fetchNote();
-  }, [note.id]);
+  }, [note]);
 
   return (
     <div
