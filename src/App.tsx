@@ -18,6 +18,7 @@ import { AiChat } from './pages/AiChat';
 import { AdminDashboard } from './pages/AdminDashboard';
 
 import { PWAManager } from './components/PWAManager';
+import { SplashScreen } from './components/SplashScreen';
 
 function GlobalFABs() {
   const location = useLocation();
@@ -80,6 +81,8 @@ export default function App() {
     return (localStorage.getItem('theme_preference') as 'light' | 'dark' | 'system') || 'system';
   });
 
+  const [showSplash, setShowSplash] = useState(true);
+
   useEffect(() => {
     const applyTheme = () => {
       const root = document.documentElement;
@@ -118,10 +121,12 @@ export default function App() {
 
 
   return (
-    <BrowserRouter>
-      <PWAManager />
-      <GlobalFABs />
-      <Routes>
+    <>
+      {showSplash && <SplashScreen onFinish={() => setShowSplash(false)} />}
+      <BrowserRouter>
+        <PWAManager />
+        <GlobalFABs />
+        <Routes>
         <Route path="/login" element={<Login />} />
         <Route 
           path="/" 
@@ -180,6 +185,7 @@ export default function App() {
           } 
         />
       </Routes>
-    </BrowserRouter>
+      </BrowserRouter>
+    </>
   );
 }
