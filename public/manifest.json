@@ -3,14 +3,20 @@
   "name": "Mutu Study - End-to-End Anonymous Study",
   "icons": [
     {
-      "src": "icon-192.png",
-      "type": "image/png",
+      "src": "icon.svg",
+      "type": "image/svg+xml",
       "sizes": "192x192"
     },
     {
-      "src": "icon-512.png",
-      "type": "image/png",
+      "src": "icon.svg",
+      "type": "image/svg+xml",
       "sizes": "512x512"
+    },
+    {
+      "src": "icon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "maskable"
     }
   ],
   "start_url": "/",
