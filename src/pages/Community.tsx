@@ -1,9 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { ArrowLeft, Send, MessageCircle, User, Loader2, X, Trash2, Ban, MoreVertical, Copy, Check, Clock, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Send, MessageCircle, User, Loader2, X, Trash2, Ban, MoreVertical, Copy, Check, Clock, CheckCircle, Reply } from 'lucide-react';
 import { User as AuthUser } from '@supabase/supabase-js';
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { cn } from '../lib/utils';
+import { TextFormatter } from '../components/TextFormatter';
+
+const isArabic = (text: string) => /[\u0600-\u06FF]/.test(text || '');
+const getTextClass = (text: string) => isArabic(text) ? 'font-arabic text-[16px] leading-relaxed text-right dir-rtl' : 'font-sans text-[15px]';
 
 interface ProfileData {
   id: string;
@@ -20,44 +25,28 @@ interface Message {
   created_at: string;
   username: string;
   avatar_url: string;
+  reply_to_id?: string | null;
 }
 
 const AVATAR_SEEDS = ['bot1', 'bot2', 'bot3', 'bot4', 'bot5', 'bot6', 'bot7', 'bot8'];
 
-const ChatBubble = React.memo(({ msg, isMe, showHeader, isAdmin, onDelete, onBan, onViewProfile }: { msg: Message, isMe: boolean, showHeader: boolean, isAdmin: boolean, onDelete: (id: string) => void, onBan: (userId: string) => void, onViewProfile: (msg: Message) => void }) => {
-  const [showMenu, setShowMenu] = useState(false);
+const ChatBubble = React.memo(({ msg, isMe, showHeader, isAdmin, onDelete, onBan, onViewProfile, repliedMsg, onReply }: { msg: Message, isMe: boolean, showHeader: boolean, isAdmin: boolean, onDelete: (id: string) => void, onBan: (userId: string) => void, onViewProfile: (msg: Message) => void, repliedMsg?: Message | null, onReply: (msg: Message) => void }) => {
   const [copied, setCopied] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
 
   const isMsgAdmin = msg.avatar_url?.includes('#admin') || false;
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setShowMenu(false);
-      }
-    };
-    if (showMenu) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [showMenu]);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(msg.message);
     setCopied(true);
     setTimeout(() => {
       setCopied(false);
-      setShowMenu(false);
     }, 2000);
   };
 
   return (
     <div className={cn("flex flex-col w-full relative", isMe ? "items-end" : "items-start", !showHeader ? "mt-1" : "mt-4")}>
       {showHeader && !isMe && (
-         <div className="flex items-center gap-2 mb-1.5 ml-1">
+         <div className="flex items-center gap-2 mb-1 ml-1">
             <img src={msg.avatar_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${msg.user_id}`} alt="Avatar" className="w-5 h-5 rounded-full bg-theme-muted" />
             <span className="text-[10px] font-bold text-theme-text/50">{msg.username || 'Unknown User'}</span>
             {isMsgAdmin && (
@@ -67,86 +56,54 @@ const ChatBubble = React.memo(({ msg, isMe, showHeader, isAdmin, onDelete, onBan
          </div>
       )}
       
-      <div className={cn("flex items-center gap-1.5 w-full", isMe ? "justify-end" : "justify-start")}>
+      <div className={cn("flex items-end gap-1.5 w-full", isMe ? "justify-end" : "justify-start")}>
         {isMe && (
-          <div className="relative" ref={isMe ? menuRef : null}>
-            <button 
-              onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }} 
-              className="p-1.5 text-theme-text/40 hover:text-theme-text/80 rounded-full transition-colors active:bg-theme-muted mt-auto"
-            >
-              <MoreVertical className="w-4 h-4" />
-            </button>
-            {showMenu && (
-              <div className="absolute top-full mt-1 right-0 min-w-[140px] bg-theme-bg border border-theme-border/50 rounded-xl shadow-md overflow-hidden z-[100] transform-gpu will-change-transform">
-                <button onClick={(e) => { e.stopPropagation(); handleCopy(); }} className="w-full flex items-center gap-2 px-3 py-2.5 text-xs text-theme-text hover:bg-theme-muted/50 transition-colors text-left font-medium">
-                  {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
-                  {copied ? 'Copied!' : 'Copy Text'}
-                </button>
-                <div className="h-px bg-theme-border/50 w-full" />
-                <button onClick={(e) => { e.stopPropagation(); setShowMenu(false); onDelete(msg.id); }} className="w-full flex items-center gap-2 px-3 py-2.5 text-xs text-red-500 hover:bg-red-500/10 transition-colors text-left font-medium">
-                  <Trash2 className="w-3.5 h-3.5" />
-                  Unsend
-                </button>
-              </div>
-            )}
-          </div>
+           <MessageMenu
+              isMe={isMe}
+              isAdmin={isAdmin}
+              copied={copied}
+              onReply={() => onReply(msg)}
+              onCopy={handleCopy}
+              onDelete={() => onDelete(msg.id)}
+           />
         )}
         
         <div 
           className={cn(
-            "w-fit max-w-[85%] px-4 py-2 text-[15px] leading-relaxed whitespace-pre-wrap break-words relative transform-gpu will-change-transform",
+            "w-fit max-w-[80%] px-3 py-1.5 whitespace-pre-wrap break-words relative transform-gpu will-change-transform text-[15px]",
             isMsgAdmin 
-              ? "bg-gradient-to-r from-[#2a020b] to-[#4C0519] text-[#e8c3a2] rounded-2xl shadow-sm border border-[#4C0519]/50" 
+              ? "bg-gradient-to-r from-[#2a020b] to-[#4C0519] text-[#e8c3a2] rounded-[18px] shadow-sm border border-[#4C0519]/50" 
               : isMe 
-                ? "bg-theme-accent-start text-white rounded-2xl rounded-tr-sm shadow-sm" 
-                : "bg-theme-card border border-theme-border/70 text-theme-text rounded-2xl rounded-tl-sm shadow-sm",
-            isMsgAdmin && isMe ? "rounded-tr-sm" : isMsgAdmin && !isMe ? "rounded-tl-sm" : ""
+                ? "bg-theme-accent-start text-white shadow-sm" 
+                : "bg-theme-card border border-theme-border/70 text-theme-text shadow-sm",
+            isMe ? "rounded-[18px] rounded-br-[4px]" : "rounded-[18px] rounded-bl-[4px]"
           )}
         >
-          {msg.message}
+          {repliedMsg && (
+             <div className="mb-1 bg-black/10 dark:bg-white/10 p-1.5 rounded-lg border-l-2 border-theme-accent-end/50 text-[11px] leading-tight opacity-90 font-sans">
+               <span className="font-bold opacity-75">{repliedMsg.username}</span>
+               <div className="truncate opacity-80 mt-0.5"><TextFormatter text={repliedMsg.message} /></div>
+             </div>
+          )}
+          <TextFormatter text={msg.message} />
         </div>
 
         {!isMe && (
-          <div className="relative" ref={!isMe ? menuRef : null}>
-             <button 
-              onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }} 
-              className="p-1.5 text-theme-text/40 hover:text-theme-text/80 rounded-full transition-colors active:bg-theme-muted mt-auto"
-            >
-              <MoreVertical className="w-4 h-4" />
-            </button>
-            {showMenu && (
-              <div className="absolute top-full mt-1 left-0 min-w-[140px] bg-theme-bg border border-theme-border/50 rounded-xl shadow-md overflow-hidden z-[100] transform-gpu will-change-transform">
-                <button onClick={(e) => { e.stopPropagation(); handleCopy(); }} className="w-full flex items-center gap-2 px-3 py-2.5 text-xs text-theme-text hover:bg-theme-muted/50 transition-colors text-left font-medium">
-                  {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
-                  {copied ? 'Copied!' : 'Copy Text'}
-                </button>
-                {isAdmin && (
-                  <>
-                    <div className="h-px bg-theme-border/50 w-full" />
-                    <button onClick={(e) => { e.stopPropagation(); setShowMenu(false); onViewProfile(msg); }} className="w-full flex items-center gap-2 px-3 py-2.5 text-xs text-theme-text hover:bg-theme-muted/50 transition-colors text-left font-medium">
-                      <User className="w-3.5 h-3.5" />
-                      View Profile
-                    </button>
-                    <div className="h-px bg-theme-border/50 w-full" />
-                    <button onClick={(e) => { e.stopPropagation(); setShowMenu(false); onBan(msg.user_id); }} className="w-full flex items-center gap-2 px-3 py-2.5 text-xs text-red-500 hover:bg-red-500/10 transition-colors text-left font-medium">
-                      <Ban className="w-3.5 h-3.5" />
-                      Ban User
-                    </button>
-                    <div className="h-px bg-theme-border/50 w-full" />
-                    <button onClick={(e) => { e.stopPropagation(); setShowMenu(false); onDelete(msg.id); }} className="w-full flex items-center gap-2 px-3 py-2.5 text-xs text-red-500 hover:bg-red-500/10 transition-colors text-left font-medium">
-                      <Trash2 className="w-3.5 h-3.5" />
-                      Delete
-                    </button>
-                  </>
-                )}
-              </div>
-            )}
-          </div>
+           <MessageMenu
+              isMe={isMe}
+              isAdmin={isAdmin}
+              copied={copied}
+              onReply={() => onReply(msg)}
+              onCopy={handleCopy}
+              onDelete={() => onDelete(msg.id)}
+              onViewProfile={() => onViewProfile(msg)}
+              onBan={() => onBan(msg.user_id)}
+           />
         )}
       </div>
 
       {showHeader && isMe && (
-         <div className="flex items-center gap-2 mt-1 mr-2 opacity-50">
+         <div className="flex items-center gap-2 mt-1 mr-2 opacity-50 font-sans">
             <span className="text-[9px] text-theme-text/70">{new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
          </div>
       )}
@@ -154,7 +111,7 @@ const ChatBubble = React.memo(({ msg, isMe, showHeader, isAdmin, onDelete, onBan
   );
 });
 
-const ChatInput = React.memo(({ profile, onSendMessage }: { profile: ProfileData | null, onSendMessage: (msg: string) => void }) => {
+const ChatInput = React.memo(({ profile, replyingTo, onClearReply, onSendMessage }: { profile: ProfileData | null, replyingTo: Message | null, onClearReply: () => void, onSendMessage: (msg: string) => void }) => {
   const [newMessage, setNewMessage] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -176,24 +133,42 @@ const ChatInput = React.memo(({ profile, onSendMessage }: { profile: ProfileData
   };
 
   return (
-    <div className="max-w-4xl mx-auto relative flex items-end">
-      <textarea 
-        ref={textareaRef}
-        rows={1}
-        placeholder={`Message as ${profile?.username}...`}
-        value={newMessage}
-        onChange={handleInput}
-        className="w-full bg-theme-muted/30 border border-theme-border rounded-[24px] py-[13px] pl-6 pr-[52px] text-[15px] leading-[20px] focus:outline-none focus:border-theme-accent-end transition-all text-theme-text resize-none overflow-y-auto block"
-        style={{ minHeight: '48px', maxHeight: '160px' }}
-      />
-      <button 
-        type="button"
-        onClick={handleSend}
-        disabled={!newMessage.trim()}
-        className="absolute right-2 bottom-[8px] w-[32px] h-[32px] flex items-center justify-center bg-theme-accent-end text-white rounded-full disabled:opacity-50 hover:scale-105 transition-transform transform-gpu will-change-transform shrink-0"
-      >
-        <Send className="w-4 h-4 -ml-[1px] mt-[1px]" />
-      </button>
+    <div className="max-w-4xl mx-auto flex flex-col font-sans">
+      {replyingTo && (
+        <div className="mb-2 bg-theme-muted/50 border border-theme-border rounded-xl p-2 px-3 flex items-start justify-between text-xs transition-all">
+           <div className="flex-1 overflow-hidden">
+             <span className="font-bold text-theme-text/70 block mb-0.5">Replying to {replyingTo.username}</span>
+             <div className="truncate w-full opacity-80 text-[13px]">
+               <TextFormatter text={replyingTo.message} />
+             </div>
+           </div>
+           <button onClick={onClearReply} className="p-1 hover:bg-theme-border/50 rounded-full text-theme-text/50 shrink-0 ml-2">
+             <X className="w-4 h-4" />
+           </button>
+        </div>
+      )}
+      <div className="relative flex items-end">
+        <textarea 
+          ref={textareaRef}
+          rows={1}
+          placeholder={`Message as ${profile?.username}...`}
+          value={newMessage}
+          onChange={handleInput}
+          className={cn(
+            "w-full bg-theme-muted/30 border border-theme-border rounded-[24px] py-[10px] pl-5 pr-[48px] leading-[20px] focus:outline-none focus:border-theme-accent-end transition-all text-theme-text resize-none overflow-y-auto block",
+            getTextClass(newMessage)
+          )}
+          style={{ minHeight: '42px', maxHeight: '160px' }}
+        />
+        <button 
+          type="button"
+          onClick={handleSend}
+          disabled={!newMessage.trim()}
+          className="absolute right-1.5 bottom-[5px] w-[32px] h-[32px] flex items-center justify-center bg-theme-accent-end text-white rounded-full disabled:opacity-50 hover:scale-105 transition-transform transform-gpu shrink-0"
+        >
+          <Send className="w-4 h-4 -ml-[1px] mt-[1px]" />
+        </button>
+      </div>
     </div>
   );
 });
@@ -212,6 +187,7 @@ export function Community() {
 
   // Chat State
   const [messages, setMessages] = useState<Message[]>([]);
+  const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const scrollContainerRef = useRef<HTMLElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -456,16 +432,24 @@ export function Community() {
       const isAdminUser = user.email === 'sadishekh671@gmail.com';
       const finalAvatarUrl = isAdminUser ? `${profile.avatar_url}#admin` : profile.avatar_url;
 
+      const payload: any = {
+        user_id: user.id,
+        message: msgText,
+        username: profile.username,
+        avatar_url: finalAvatarUrl
+      };
+      
+      if (replyingTo) {
+        payload.reply_to_id = replyingTo.id;
+      }
+
       const { data, error } = await supabase
         .from('community_messages')
-        .insert([{
-          user_id: user.id,
-          message: msgText,
-          username: profile.username,
-          avatar_url: finalAvatarUrl
-        }])
+        .insert([payload])
         .select()
         .single();
+
+      setReplyingTo(null);
 
       if (error) throw error;
       
@@ -478,16 +462,19 @@ export function Community() {
       }
     } catch (e: any) {
       console.error(e);
-      alert('Error sending message: ' + (e.message || 'Unknown error'));
-      // In a real app we'd want to expose the error back to ChatInput to restore text,
-      // but separating concerns means we either pass a fallback or ignore.
+      if (e.message && e.message.includes('row-level security policy')) {
+        alert('Action restricted. You might have been suspended or banned from interactions.');
+      } else {
+        alert('Error sending message: ' + (e.message || 'Unknown error'));
+      }
+      setReplyingTo(null);
     }
   };
 
   if (!user) return null;
 
   return (
-    <div className="flex flex-col min-h-screen bg-theme-bg font-sans max-h-screen">
+    <div className="flex flex-col h-[100dvh] bg-theme-bg font-sans overflow-hidden">
       <header className="h-[56px] px-4 md:px-6 flex items-center border-b border-theme-border bg-theme-bg shrink-0 z-40 sticky top-0 justify-between w-full">
         <div className="flex items-center">
             <button onClick={() => navigate('/')} className="p-2 rounded-full hover:bg-theme-muted transition-colors text-theme-text/80 mr-3 shrink-0">
@@ -597,13 +584,13 @@ export function Community() {
         </div>
       ) : (
         <>
-          <main ref={scrollContainerRef} className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 relative scroll-smooth">
+          <main ref={scrollContainerRef} className="flex-1 overflow-y-auto w-full p-4 md:p-6 space-y-2 relative scroll-smooth bg-theme-bg">
             {isLoading ? (
-               <div className="h-full flex items-center justify-center text-theme-text/40 gap-2">
+               <div className="h-full flex items-center justify-center text-theme-text/40 gap-2 font-sans">
                  <Loader2 className="w-5 h-5 animate-spin" /> Loading connection...
                </div>
             ) : messages.length === 0 ? (
-               <div className="text-center py-20 text-theme-text/50">
+               <div className="text-center py-20 text-theme-text/50 font-sans">
                  <MessageCircle className="w-12 h-12 mx-auto mb-4 opacity-20" />
                  <p>No messages yet. Say hello to the community!</p>
                </div>
@@ -612,6 +599,7 @@ export function Community() {
                  const isMe = msg.user_id === user?.id;
                  const showHeader = idx === 0 || messages[idx - 1].user_id !== msg.user_id || 
                     (new Date(msg.created_at).getTime() - new Date(messages[idx - 1].created_at).getTime() > 5 * 60000); // 5 mins gap
+                 const repliedMsg = msg.reply_to_id ? messages.find(m => m.id === msg.reply_to_id) || null : null;
 
                  return <ChatBubble 
                    key={msg.id} 
@@ -619,24 +607,31 @@ export function Community() {
                    isMe={isMe} 
                    showHeader={showHeader}
                    isAdmin={isAdmin}
+                   repliedMsg={repliedMsg}
                    onDelete={handleDeleteMessage}
                    onBan={handleBanUser}
                    onViewProfile={setSelectedAdminProfile}
+                   onReply={setReplyingTo}
                  />;
                })
             )}
-            <div ref={messagesEndRef} className="h-20 shrink-0" />
+            <div ref={messagesEndRef} className="h-4 shrink-0" />
           </main>
 
-          <footer className="p-4 border-t border-theme-border bg-theme-bg shrink-0">
-            {profile?.is_banned || (profile?.suspended_until && new Date(profile.suspended_until) > new Date()) ? (
-               <div className="max-w-4xl mx-auto bg-red-500/10 border border-red-500/20 text-red-500 text-sm font-bold p-4 rounded-xl flex items-center justify-center gap-2 text-center transform-gpu will-change-transform">
-                  <Ban className="w-5 h-5 shrink-0" />
-                  You have been restricted from the community for violating rules.
-               </div>
-            ) : (
-               <ChatInput profile={profile} onSendMessage={handleSendMessage} />
-            )}
+          <footer className="sticky bottom-0 bg-theme-bg border-t border-theme-border p-3 md:p-4 shrink-0 z-20 w-full mb-safe">
+             {profile?.is_banned || (profile?.suspended_until && new Date(profile.suspended_until) > new Date()) ? (
+                <div className="max-w-4xl mx-auto bg-red-500/10 border border-red-500/20 text-red-500 text-sm font-bold p-4 rounded-xl flex items-center justify-center gap-2 text-center transform-gpu will-change-transform">
+                   <Ban className="w-5 h-5 shrink-0" />
+                   You have been restricted from the community for violating rules.
+                </div>
+             ) : (
+                <ChatInput 
+                   profile={profile} 
+                   replyingTo={replyingTo}
+                   onClearReply={() => setReplyingTo(null)}
+                   onSendMessage={handleSendMessage} 
+                />
+             )}
           </footer>
         </>
       )}
@@ -744,5 +739,57 @@ export function Community() {
         </div>
       )}
     </div>
+  );
+}
+
+export function MessageMenu({ isMe, isAdmin, copied, onReply, onCopy, onDelete, onViewProfile, onBan }: any) {
+  return (
+    <DropdownMenu.Root modal={false}>
+      <DropdownMenu.Trigger asChild>
+        <button onClick={(e) => e.stopPropagation()} className="p-1 mb-1 text-theme-text/40 hover:text-theme-text/80 rounded-full outline-none focus:ring-2 focus:ring-theme-accent-start/50 transition-colors shrink-0">
+          <MoreVertical className="w-3.5 h-3.5" />
+        </button>
+      </DropdownMenu.Trigger>
+
+      <DropdownMenu.Portal>
+        <DropdownMenu.Content 
+           className="min-w-[140px] max-w-[220px] bg-theme-bg border border-theme-border/50 rounded-xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.15)] z-[99999] overflow-hidden font-sans p-1 animate-in fade-in zoom-in-95 data-[side=top]:slide-in-from-bottom-2 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2"
+           sideOffset={8}
+           align={isMe ? 'end' : 'start'}
+           side="top"
+           collisionPadding={20}
+           avoidCollisions={true}
+        >
+          <DropdownMenu.Item className="flex items-center gap-2 px-2 py-2 text-xs text-theme-text hover:bg-theme-muted/50 rounded-lg outline-none cursor-pointer select-none font-medium transition-colors" onSelect={onReply}>
+            <Reply className="w-3.5 h-3.5" /> Reply
+          </DropdownMenu.Item>
+          
+          <DropdownMenu.Item className="flex items-center gap-2 px-2 py-2 text-xs text-theme-text hover:bg-theme-muted/50 rounded-lg outline-none cursor-pointer select-none font-medium transition-colors" onSelect={(e) => { e.preventDefault(); onCopy(); }}>
+            {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />} {copied ? 'Copied!' : 'Copy'}
+          </DropdownMenu.Item>
+
+          {(isMe || isAdmin) && (
+             <>
+               <DropdownMenu.Separator className="h-px bg-theme-border/50 my-1 -mx-1" />
+               <DropdownMenu.Item className="flex items-center gap-2 px-2 py-2 text-xs text-red-500 hover:bg-red-500/10 rounded-lg outline-none cursor-pointer select-none font-medium transition-colors" onSelect={onDelete}>
+                 <Trash2 className="w-3.5 h-3.5" /> {isMe ? 'Unsend' : 'Delete'}
+               </DropdownMenu.Item>
+             </>
+          )}
+
+          {isAdmin && !isMe && onViewProfile && onBan && (
+             <>
+                <DropdownMenu.Separator className="h-px bg-theme-border/50 my-1 -mx-1" />
+                <DropdownMenu.Item className="flex items-center gap-2 px-2 py-2 text-xs text-theme-text hover:bg-theme-muted/50 rounded-lg outline-none cursor-pointer select-none font-medium transition-colors" onSelect={onViewProfile}>
+                  <User className="w-3.5 h-3.5" /> View Profile
+                </DropdownMenu.Item>
+                <DropdownMenu.Item className="flex items-center gap-2 px-2 py-2 text-xs text-red-500 hover:bg-red-500/10 rounded-lg outline-none cursor-pointer select-none font-medium transition-colors" onSelect={onBan}>
+                  <Ban className="w-3.5 h-3.5" /> Ban User
+                </DropdownMenu.Item>
+             </>
+          )}
+        </DropdownMenu.Content>
+      </DropdownMenu.Portal>
+    </DropdownMenu.Root>
   );
 }

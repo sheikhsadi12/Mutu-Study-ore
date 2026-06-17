@@ -20,6 +20,11 @@ export function NoteView({ note, onBack, isDarkMode = false }: NoteViewProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    document.body.classList.add("note-view-open");
+    return () => document.body.classList.remove("note-view-open");
+  }, []);
+
+  useEffect(() => {
     const fetchNote = async () => {
       const { data, error } = await supabase
         .from("notes")
@@ -33,21 +38,17 @@ export function NoteView({ note, onBack, isDarkMode = false }: NoteViewProps) {
 
   return (
     <div
-      className={`flex flex-col h-full bg-theme-bg overflow-y-auto ${isFullscreen ? "fixed inset-0 z-50 w-full min-h-screen" : ""}`}
-      ref={scrollRef}
+      className={`flex flex-col h-full bg-theme-bg overflow-hidden ${isFullscreen ? "fixed inset-0 z-50 w-full" : "relative w-full"}`}
     >
-      {/* Frame Container for actual note payload */}
-      <div
-        className={
-          isFullscreen
-            ? "w-full min-h-screen relative flex-1"
-            : "w-full flex-1 relative flex-shrink-0"
-        }
+      {/* Scrollable Content Area */}
+      <div 
+        className="w-full flex-1 overflow-y-auto overflow-x-hidden relative" 
+        ref={scrollRef}
       >
         {isFullscreen ? (
           <button
             onClick={() => setIsFullscreen(false)}
-            className="fixed top-4 right-4 z-50 bg-theme-card text-theme-text p-2 rounded-full shadow-md hover:bg-theme-muted transition-colors w-8 h-8 flex items-center justify-center border border-theme-border"
+            className="fixed top-4 right-4 z-[60] bg-theme-card text-theme-text p-2 rounded-full shadow-md hover:bg-theme-muted transition-colors w-8 h-8 flex items-center justify-center border border-theme-border"
             title="Exit Fullscreen"
           >
             <X className="w-4 h-4" />
@@ -78,14 +79,14 @@ export function NoteView({ note, onBack, isDarkMode = false }: NoteViewProps) {
         <div
           className={
             fullNote?.html_code && !fullNote.html_code.startsWith("data:application/pdf")
-              ? "w-full h-full p-0 m-0 relative flex flex-col"
+              ? "w-full min-h-full p-0 m-0 relative flex flex-col"
               : note.type === "STATIC_A4"
-              ? `max-w-[794px] w-full mx-auto p-0 m-0 relative h-full ${isDarkMode ? "bg-white" : ""}`
-              : "w-full h-full p-0 m-0 relative"
+              ? `max-w-[794px] w-full mx-auto p-0 m-0 relative min-h-full ${isDarkMode ? "bg-white" : ""}`
+              : "w-full min-h-full p-0 m-0 relative"
           }
         >
           {!fullNote?.html_code ? (
-            <div className="flex items-center justify-center min-h-screen opacity-50">
+            <div className="flex items-center justify-center min-h-[50vh] opacity-50 font-sans">
               Loading material...
             </div>
           ) : fullNote.html_code.startsWith("data:application/pdf") ? (
@@ -94,22 +95,25 @@ export function NoteView({ note, onBack, isDarkMode = false }: NoteViewProps) {
               type="application/pdf"
               className="w-full min-h-screen border-none block bg-white"
             >
-              <div className="p-10 text-center w-full mt-20 font-bold opacity-50">
+              <div className="p-10 text-center w-full mt-20 font-bold opacity-50 font-sans">
                 Browser unable to inline PDF.<br /><br /> <a href={fullNote.html_code} download={note.title + ".pdf"} className="underline text-theme-accent-end">Download PDF directly</a>
               </div>
             </object>
           ) : (
-            <div className="w-full h-full flex-1 min-h-screen p-0 m-0">
+            <div className="w-full h-full flex-1 min-h-full p-0 m-0">
               <DynamicCodeViewer content={fullNote.html_code} />
             </div>
           )}
         </div>
       </div>
 
-      {/* Community System (scrollable underneath) */}
+      {/* Community System Footer */}
       {!isFullscreen && (
-        <Comments noteId={note.id} />
+        <div className="w-full shrink-0">
+          <Comments noteId={note.id} />
+        </div>
       )}
     </div>
   );
 }
+

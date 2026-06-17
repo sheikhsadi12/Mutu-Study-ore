@@ -1,7 +1,12 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Heart, Send, MessageCircle, MoreVertical, Copy, Check, Trash2, User, Ban, X, Loader2, Clock, CheckCircle } from "lucide-react";
+import { Heart, Send, MessageCircle, MoreVertical, Copy, Check, Trash2, User, Ban, X, Loader2, Clock, CheckCircle, Reply, ChevronLeft } from "lucide-react";
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { supabase } from "../supabaseClient";
 import { cn } from "../lib/utils";
+import { TextFormatter } from "./TextFormatter";
+
+const isArabic = (text: string) => /[\u0600-\u06FF]/.test(text || '');
+const getTextClass = (text: string) => isArabic(text) ? 'font-arabic text-[16px] leading-relaxed text-right dir-rtl' : 'font-sans text-[15px]';
 
 interface ProfileData {
   id: string;
@@ -19,15 +24,18 @@ interface NoteComment {
   avatar_url: string;
   content: string;
   created_at: string;
+  reply_to_id?: string | null;
 }
 
 export function Comments({ noteId }: { noteId: string }) {
+  const [isOpen, setIsOpen] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [comments, setComments] = useState<NoteComment[]>([]);
   const [likesCount, setLikesCount] = useState(0);
   const [hasLiked, setHasLiked] = useState(false);
   const [newComment, setNewComment] = useState("");
+  const [replyingTo, setReplyingTo] = useState<NoteComment | null>(null);
   
   const [selectedAdminProfile, setSelectedAdminProfile] = useState<NoteComment | null>(null);
   const [adminUserStatus, setAdminUserStatus] = useState<{is_banned: boolean, suspended_until: string | null} | null>(null);
@@ -192,17 +200,29 @@ export function Comments({ noteId }: { noteId: string }) {
     const isAdminUser = user.email === 'sadishekh671@gmail.com';
     const finalAvatarUrl = isAdminUser ? `${profile.avatar_url}#admin` : profile.avatar_url;
 
-    const { data, error } = await supabase.from('note_comments').insert({
+    const payload: any = {
        note_id: noteId,
        user_id: user.id,
        username: profile.username || 'User',
        avatar_url: finalAvatarUrl,
        content: contentStr
-    }).select().single();
+    };
+    
+    if (replyingTo) {
+       payload.reply_to_id = replyingTo.id;
+    }
+
+    const { data, error } = await supabase.from('note_comments').insert(payload).select().single();
+    
+    setReplyingTo(null);
 
     if (error) {
        console.error("Comment error:", error);
-       alert("Failed to submit comment.");
+       if (error.message && error.message.includes('row-level security policy')) {
+          alert('Action restricted. You might have been suspended or banned from interactions.');
+       } else {
+          alert("Failed to submit comment.");
+       }
        setNewComment(contentStr);
     } else if (data) {
        setComments(prev => {
@@ -226,76 +246,115 @@ export function Comments({ noteId }: { noteId: string }) {
      await supabase.from('profiles').update({ is_banned: true }).eq('id', userId);
   };
 
+  // Sticky footer when comments are hidden
+  if (!isOpen) {
+    return (
+      <div className="sticky bottom-0 left-0 w-full bg-theme-bg/95 backdrop-blur-md border-t border-theme-border p-3 flex items-center justify-around shadow-[0_-10px_25px_rgb(0,0,0,0.05)] z-40 mt-auto">
+         <button onClick={handleLike} className={cn("flex flex-col items-center justify-center gap-1 min-w-[80px]", hasLiked ? "text-theme-accent-end" : "text-theme-text/80")}>
+            <Heart className={cn("w-6 h-6 transition-transform active:scale-90", hasLiked && "fill-theme-accent-end")} />
+            <span className="text-xs font-bold">{likesCount} Likes</span>
+         </button>
+         <button onClick={() => setIsOpen(true)} className="flex flex-col items-center justify-center gap-1 min-w-[80px] text-theme-text/80 hover:text-theme-accent-end transition-colors active:scale-95">
+            <MessageCircle className="w-6 h-6" />
+            <span className="text-xs font-bold">{comments.length} Comments</span>
+         </button>
+      </div>
+    );
+  }
+
+  // Full Screen overlay when comments are open
   return (
-    <div className="p-5 shrink-0 bg-theme-card border-t border-theme-border shadow-[0_-4px_20px_rgb(0,0,0,0.02)] isolate z-10 w-full mt-auto">
-      <div className="flex items-center gap-4 mb-6">
-        <button
-          onClick={handleLike}
-          className={cn(
-            "flex items-center gap-2 px-5 py-2.5 rounded-[25px] transition-all cursor-pointer font-semibold shadow-sm",
-            hasLiked
-              ? "bg-gradient-to-r from-theme-accent-start to-theme-accent-end text-white border-transparent"
-              : "bg-theme-bg border border-theme-border text-theme-text/80 hover:bg-theme-muted"
-          )}
-        >
-          <Heart className={cn("w-4 h-4", hasLiked && "fill-white")} />
-          <span>{likesCount} Likes</span>
-        </button>
-        <div className="flex items-center gap-2 text-theme-text/60 font-semibold px-2">
-          <MessageCircle className="w-5 h-5" />
-          <span>{comments.length} Comments</span>
+    <div className="fixed inset-0 z-[100] flex flex-col bg-theme-bg w-full h-full animate-in slide-in-from-bottom-5 duration-200">
+      {/* Header */}
+      <div className="flex items-center justify-between p-3 border-b border-theme-border bg-theme-bg shadow-sm z-10 shrink-0">
+        <div className="flex items-center gap-3">
+          <button onClick={() => setIsOpen(false)} className="p-2 -ml-2 rounded-full hover:bg-theme-muted transition-colors">
+            <ChevronLeft className="w-6 h-6" />
+          </button>
+          <div className="flex flex-col">
+            <span className="font-bold text-[15px]">{comments.length} Comments</span>
+            <span className="text-[11px] text-theme-text/50 font-medium tracking-wide">Community Discussion</span>
+          </div>
         </div>
       </div>
 
-      <div className="space-y-5 max-w-2xl mx-auto">
-        <h3 className="font-heading font-black text-xl border-b border-theme-border pb-3">
-          Community Discussion
-        </h3>
-
-        {isRestricted ? (
-           <div className="max-w-4xl mx-auto bg-red-500/10 border border-red-500/20 text-red-500 text-sm font-bold p-4 rounded-xl flex items-center justify-center gap-2 text-center transform-gpu will-change-transform">
-              <Ban className="w-5 h-5 shrink-0" />
-              You have been restricted from interactions.
-           </div>
+      {/* Message List */}
+      <div className="flex-1 overflow-y-auto p-3 flex flex-col-reverse gap-3 bg-theme-bg pb-24">
+        {comments.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-10 opacity-50">
+            <MessageCircle className="w-10 h-10 mb-2" />
+            <p className="text-sm font-semibold tracking-wide uppercase">Be the first to start the discussion.</p>
+          </div>
         ) : (
-           <div className="relative flex items-end">
-              <textarea
-                ref={textareaRef}
-                rows={1}
-                placeholder="Share a thoughtful insight..."
-                value={newComment}
-                onChange={handleInput}
-                className="w-full bg-theme-muted/30 border border-theme-border rounded-[24px] py-[13px] pl-6 pr-[52px] text-[15px] leading-[20px] focus:outline-none focus:border-theme-accent-end transition-all text-theme-text resize-none overflow-y-auto block"
-                style={{ minHeight: '48px', maxHeight: '160px' }}
-              />
-              <button
-                type="button"
-                onClick={handleAddComment}
-                disabled={!newComment.trim()}
-                className="absolute right-2 bottom-[8px] w-[32px] h-[32px] flex items-center justify-center bg-theme-accent-end text-white rounded-full disabled:opacity-50 hover:scale-105 transition-transform transform-gpu will-change-transform shrink-0"
-              >
-                <Send className="w-4 h-4 -ml-[1px] mt-[1px]" />
-              </button>
-           </div>
-        )}
+          comments.map((c, i) => {
+             const isMe = c.user_id === user?.id;
+             const showHeader = i === comments.length - 1 || comments[i + 1].user_id !== c.user_id || 
+                  (new Date(c.created_at).getTime() - new Date(comments[i + 1].created_at).getTime() > 5 * 60000);
+             
+             const repliedMsg = c.reply_to_id ? comments.find(m => m.id === c.reply_to_id) || null : null;
 
-        <div className="space-y-4 mt-6 pb-12">
-          {comments.length === 0 ? (
-            <p className="text-center text-theme-text/50 py-8 text-sm font-semibold tracking-wide uppercase">
-              Be the first to start the discussion.
-            </p>
-          ) : (
-            comments.map((c, i) => (
+             return (
                <CommentItem 
                   key={c.id} 
                   comment={c} 
-                  isMe={c.user_id === user?.id}
+                  isMe={isMe}
+                  showHeader={showHeader}
                   isAdmin={isAdmin}
+                  repliedMsg={repliedMsg}
                   onDelete={handleDeleteComment}
                   onBan={handleBanUser}
                   onViewProfile={setSelectedAdminProfile}
+                  onReply={setReplyingTo}
                />
-            ))
+             );
+          })
+        )}
+      </div>
+
+      {/* Input box absolute/sticky at bottom */}
+      <div className="absolute bottom-0 left-0 w-full bg-theme-bg border-t border-theme-border z-50 p-2 md:p-3 shadow-lg shrink-0 mb-safe">
+        <div className="max-w-4xl mx-auto flex flex-col font-sans">
+          {replyingTo && (
+            <div className="mb-2 bg-theme-muted/50 border border-theme-border rounded-xl p-2 px-3 flex items-start justify-between text-xs transition-all">
+               <div className="flex-1 overflow-hidden">
+                 <span className="font-bold text-theme-text/70 block mb-0.5">Replying to {replyingTo.username}</span>
+                 <div className="truncate w-full opacity-80 text-[13px]">
+                   <TextFormatter text={replyingTo.content} />
+                 </div>
+               </div>
+               <button onClick={() => setReplyingTo(null)} className="p-1 hover:bg-theme-border/50 rounded-full text-theme-text/50 shrink-0 ml-2">
+                 <X className="w-4 h-4" />
+               </button>
+            </div>
+          )}
+          {isRestricted ? (
+             <div className="w-full bg-red-500/10 border border-red-500/20 text-red-500 text-sm font-bold p-3 rounded-xl flex items-center justify-center gap-2 text-center">
+                <Ban className="w-5 h-5 shrink-0" />
+                Restricted from interactions.
+             </div>
+          ) : (
+             <div className="relative flex items-end">
+                <textarea
+                  ref={textareaRef}
+                  rows={1}
+                  placeholder="Share a thoughtful insight..."
+                  value={newComment}
+                  onChange={handleInput}
+                  className={cn(
+                    "w-full bg-theme-muted/30 border border-theme-border rounded-[20px] py-[8px] pl-4 pr-[42px] leading-[20px] focus:outline-none focus:border-theme-accent-end transition-all text-theme-text resize-none overflow-y-auto block",
+                    getTextClass(newComment)
+                  )}
+                  style={{ minHeight: '38px', maxHeight: '120px' }}
+                />
+                <button
+                  type="button"
+                  onClick={handleAddComment}
+                  disabled={!newComment.trim()}
+                  className="absolute right-1.5 bottom-[3px] w-[32px] h-[32px] flex items-center justify-center bg-theme-accent-end text-white rounded-full disabled:opacity-50 hover:scale-105 transition-transform transform-gpu shrink-0 shadow-sm"
+                >
+                  <Send className="w-4 h-4 -ml-[1px] mt-[1px]" />
+                </button>
+             </div>
           )}
         </div>
       </div>
@@ -405,85 +464,132 @@ export function Comments({ noteId }: { noteId: string }) {
   );
 }
 
-const CommentItem = React.memo(({ comment, isMe, isAdmin, onDelete, onBan, onViewProfile }: { comment: NoteComment, isMe: boolean, isAdmin: boolean, onDelete: (id: string) => void, onBan: (id: string) => void, onViewProfile: (c: NoteComment) => void }) => {
-   const [showMenu, setShowMenu] = useState(false);
+const CommentItem = React.memo(({ comment, isMe, isAdmin, showHeader, repliedMsg, onDelete, onBan, onViewProfile, onReply }: { comment: NoteComment, isMe: boolean, isAdmin: boolean, showHeader: boolean, repliedMsg?: NoteComment | null, onDelete: (id: string) => void, onBan: (id: string) => void, onViewProfile: (c: NoteComment) => void, onReply: (msg: NoteComment) => void }) => {
    const [copied, setCopied] = useState(false);
-   const menuRef = useRef<HTMLDivElement>(null);
-
    const isMsgAdmin = comment.avatar_url?.includes('#admin') || false;
-
-   useEffect(() => {
-     const handleClickOutside = (event: MouseEvent) => {
-       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-         setShowMenu(false);
-       }
-     };
-     if (showMenu) document.addEventListener('mousedown', handleClickOutside);
-     return () => document.removeEventListener('mousedown', handleClickOutside);
-   }, [showMenu]);
 
    const handleCopy = () => {
      navigator.clipboard.writeText(comment.content);
      setCopied(true);
-     setTimeout(() => { setCopied(false); setShowMenu(false); }, 2000);
+     setTimeout(() => { setCopied(false); }, 2000);
    };
 
    return (
-      <div className="flex gap-3 group relative w-full items-start">
-         <img src={comment.avatar_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${comment.user_id}`} alt="Avatar" className="w-8 h-8 rounded-full bg-theme-muted shrink-0" />
-         
-         <div className={cn("bg-theme-card border border-theme-border/70 p-3.5 rounded-2xl rounded-tl-sm text-[14px] flex-1 shadow-sm relative transition-all", isMsgAdmin && "bg-gradient-to-r from-[#2a020b] to-[#4C0519] border-[#4C0519]/50 text-[#e8c3a2]")}>
-            <div className="flex justify-between items-center mb-1.5">
-               <div className="flex items-center gap-1.5">
-                  <p className="font-bold">{comment.username || 'Unknown'}</p>
-                  {isMsgAdmin && <span className="text-[9px] bg-yellow-500/20 border border-yellow-500/30 text-yellow-500 px-1.5 py-0.5 rounded font-black tracking-widest uppercase shadow-sm">👑 Admin</span>}
-                  <span className="text-[10px] text-theme-text/40 ml-1">{new Date(comment.created_at).toLocaleDateString()}</span>
-               </div>
-               
-               <div className="relative" ref={menuRef}>
-                  <button 
-                     onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }} 
-                     className="p-1 text-theme-text/30 hover:text-theme-text/80 rounded-full transition-colors active:bg-theme-muted"
-                  >
-                     <MoreVertical className="w-4 h-4" />
-                  </button>
-                  {showMenu && (
-                     <div className="absolute top-full right-0 mt-1 min-w-[140px] bg-theme-bg border border-theme-border/50 rounded-xl shadow-md overflow-hidden z-[100] transform-gpu will-change-transform">
-                        <button onClick={(e) => { e.stopPropagation(); handleCopy(); }} className="w-full flex items-center gap-2 px-3 py-2.5 text-xs text-theme-text hover:bg-theme-muted/50 transition-colors text-left font-medium">
-                           {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
-                           {copied ? 'Copied!' : 'Copy Text'}
-                        </button>
-                        {(isMe || isAdmin) && (
-                           <>
-                              <div className="h-px bg-theme-border/50 w-full" />
-                              <button onClick={(e) => { e.stopPropagation(); setShowMenu(false); onDelete(comment.id); }} className="w-full flex items-center gap-2 px-3 py-2.5 text-xs text-red-500 hover:bg-red-500/10 transition-colors text-left font-medium">
-                                 <Trash2 className="w-3.5 h-3.5" />
-                                 Delete
-                              </button>
-                           </>
-                        )}
-                        {isAdmin && !isMe && (
-                           <>
-                              <div className="h-px bg-theme-border/50 w-full" />
-                              <button onClick={(e) => { e.stopPropagation(); setShowMenu(false); onViewProfile(comment); }} className="w-full flex items-center gap-2 px-3 py-2.5 text-xs text-theme-text hover:bg-theme-muted/50 transition-colors text-left font-medium">
-                                 <User className="w-3.5 h-3.5" />
-                                 View Profile
-                              </button>
-                              <div className="h-px bg-theme-border/50 w-full" />
-                              <button onClick={(e) => { e.stopPropagation(); setShowMenu(false); onBan(comment.user_id); }} className="w-full flex items-center gap-2 px-3 py-2.5 text-xs text-red-500 hover:bg-red-500/10 transition-colors text-left font-medium">
-                                 <Ban className="w-3.5 h-3.5" />
-                                 Ban User
-                              </button>
-                           </>
-                        )}
-                     </div>
-                  )}
-               </div>
-            </div>
-            <p className={cn("leading-relaxed", isMsgAdmin ? "opacity-90" : "opacity-80 whitespace-pre-wrap break-words")}>
-               {comment.content}
-            </p>
+    <div className={cn("flex flex-col w-full relative", isMe ? "items-end" : "items-start", !showHeader ? "mt-0.5" : "mt-3")}>
+      {showHeader && !isMe && (
+         <div className="flex items-center gap-1.5 mb-1 ml-1 font-sans">
+            <img src={comment.avatar_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${comment.user_id}`} alt="Avatar" className="w-4 h-4 rounded-full bg-theme-muted" />
+            <span className="text-[10px] font-bold text-theme-text/50">{comment.username || 'Unknown User'}</span>
+            {isMsgAdmin && (
+              <span className="text-[8px] bg-yellow-500/20 border border-yellow-500/30 text-yellow-500 px-1 py-[1px] rounded font-black tracking-widest uppercase shadow-sm">👑 Admin</span>
+            )}
+            <span className="text-[9px] text-theme-text/30">{new Date(comment.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
          </div>
+      )}
+      
+      <div className={cn("flex items-end gap-1.5 w-full", isMe ? "justify-end" : "justify-start")}>
+        {isMe && (
+           <MessageMenu
+              isMe={isMe}
+              isAdmin={isAdmin}
+              copied={copied}
+              onReply={() => onReply(comment)}
+              onCopy={handleCopy}
+              onDelete={() => onDelete(comment.id)}
+           />
+        )}
+        
+        <div 
+          className={cn(
+            "w-fit max-w-[85%] px-3 py-1.5 whitespace-pre-wrap break-words relative transform-gpu will-change-transform leading-relaxed shadow-sm text-[15px]",
+            isMsgAdmin  
+              ? "bg-gradient-to-r from-[#2a020b] to-[#4C0519] text-[#e8c3a2] border border-[#4C0519]/50" 
+              : isMe 
+                ? "bg-theme-accent-start text-white" 
+                : "bg-theme-card border border-theme-border/70 text-theme-text",
+            isMe ? "rounded-[18px] rounded-br-[4px]" : "rounded-[18px] rounded-bl-[4px]"
+          )}
+        >
+          {repliedMsg && (
+             <div className="mb-1 bg-black/10 dark:bg-white/10 p-1.5 rounded-lg border-l-2 border-theme-accent-end/50 text-[11px] leading-tight opacity-90 font-sans">
+               <span className="font-bold opacity-75">{repliedMsg.username}</span>
+               <div className="truncate opacity-80 mt-0.5"><TextFormatter text={repliedMsg.content} /></div>
+             </div>
+          )}
+          <TextFormatter text={comment.content} />
+        </div>
+
+        {!isMe && (
+           <MessageMenu
+              isMe={isMe}
+              isAdmin={isAdmin}
+              copied={copied}
+              onReply={() => onReply(comment)}
+              onCopy={handleCopy}
+              onDelete={() => onDelete(comment.id)}
+              onViewProfile={() => onViewProfile(comment)}
+              onBan={() => onBan(comment.user_id)}
+           />
+        )}
       </div>
-   );
+
+      {showHeader && isMe && (
+         <div className="flex items-center gap-2 mt-0.5 mr-2 opacity-50 font-sans">
+            <span className="text-[9px] text-theme-text/70">{new Date(comment.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+         </div>
+      )}
+    </div>
+  );
 });
+
+function MessageMenu({ isMe, isAdmin, copied, onReply, onCopy, onDelete, onViewProfile, onBan }: any) {
+  return (
+    <DropdownMenu.Root modal={false}>
+      <DropdownMenu.Trigger asChild>
+        <button onClick={(e) => e.stopPropagation()} className="p-1 mb-1 text-theme-text/40 hover:text-theme-text/80 rounded-full outline-none focus:ring-2 focus:ring-theme-accent-start/50 transition-colors">
+          <MoreVertical className="w-3.5 h-3.5" />
+        </button>
+      </DropdownMenu.Trigger>
+
+      <DropdownMenu.Portal>
+        <DropdownMenu.Content 
+           className="min-w-[140px] max-w-[220px] bg-theme-bg border border-theme-border/50 rounded-xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.15)] z-[99999] overflow-hidden font-sans p-1 animate-in fade-in zoom-in-95 data-[side=top]:slide-in-from-bottom-2 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2"
+           sideOffset={8}
+           align={isMe ? 'end' : 'start'}
+           side="top"
+           collisionPadding={20}
+           avoidCollisions={true}
+        >
+          <DropdownMenu.Item className="flex items-center gap-2 px-2 py-2 text-xs text-theme-text hover:bg-theme-muted/50 rounded-lg outline-none cursor-pointer select-none font-medium transition-colors" onSelect={onReply}>
+            <Reply className="w-3.5 h-3.5" /> Reply
+          </DropdownMenu.Item>
+          
+          <DropdownMenu.Item className="flex items-center gap-2 px-2 py-2 text-xs text-theme-text hover:bg-theme-muted/50 rounded-lg outline-none cursor-pointer select-none font-medium transition-colors" onSelect={(e) => { e.preventDefault(); onCopy(); }}>
+            {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />} {copied ? 'Copied!' : 'Copy'}
+          </DropdownMenu.Item>
+
+          {(isMe || isAdmin) && (
+             <>
+               <DropdownMenu.Separator className="h-px bg-theme-border/50 my-1 -mx-1" />
+               <DropdownMenu.Item className="flex items-center gap-2 px-2 py-2 text-xs text-red-500 hover:bg-red-500/10 rounded-lg outline-none cursor-pointer select-none font-medium transition-colors" onSelect={onDelete}>
+                 <Trash2 className="w-3.5 h-3.5" /> Delete
+               </DropdownMenu.Item>
+             </>
+          )}
+
+          {isAdmin && !isMe && onViewProfile && onBan && (
+             <>
+                <DropdownMenu.Separator className="h-px bg-theme-border/50 my-1 -mx-1" />
+                <DropdownMenu.Item className="flex items-center gap-2 px-2 py-2 text-xs text-theme-text hover:bg-theme-muted/50 rounded-lg outline-none cursor-pointer select-none font-medium transition-colors" onSelect={onViewProfile}>
+                  <User className="w-3.5 h-3.5" /> View Profile
+                </DropdownMenu.Item>
+                <DropdownMenu.Item className="flex items-center gap-2 px-2 py-2 text-xs text-red-500 hover:bg-red-500/10 rounded-lg outline-none cursor-pointer select-none font-medium transition-colors" onSelect={onBan}>
+                  <Ban className="w-3.5 h-3.5" /> Ban User
+                </DropdownMenu.Item>
+             </>
+          )}
+        </DropdownMenu.Content>
+      </DropdownMenu.Portal>
+    </DropdownMenu.Root>
+  );
+}

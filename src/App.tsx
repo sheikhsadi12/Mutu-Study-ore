@@ -24,7 +24,7 @@ function GlobalFABs() {
   if (location.pathname !== '/') return null;
 
   return (
-    <div className="fixed bottom-6 right-6 z-[60] flex flex-col gap-3">
+    <div id="global-fabs" className="fixed bottom-6 right-6 z-[60] flex flex-col gap-3">
       <button 
         onClick={() => navigate('/community')}
         className="w-12 h-12 rounded-full shadow-lg flex items-center justify-center transition-all duration-300 bg-theme-bg border border-theme-border text-theme-accent-end hover:scale-105 hover:bg-theme-muted active:scale-95"
