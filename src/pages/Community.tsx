@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { ArrowLeft, Send, MessageCircle, User, Loader2, X, Trash2, Ban } from 'lucide-react';
+import { ArrowLeft, Send, MessageCircle, User, Loader2, X, Trash2, Ban, MoreVertical, Copy, Check } from 'lucide-react';
 import { User as AuthUser } from '@supabase/supabase-js';
 import { cn } from '../lib/utils';
 
@@ -19,13 +19,43 @@ interface Message {
   created_at: string;
   username: string;
   avatar_url: string;
+  email?: string;
 }
 
 const AVATAR_SEEDS = ['bot1', 'bot2', 'bot3', 'bot4', 'bot5', 'bot6', 'bot7', 'bot8'];
 
 const ChatBubble = React.memo(({ msg, isMe, showHeader, isAdmin, onDelete, onBan }: { msg: Message, isMe: boolean, showHeader: boolean, isAdmin: boolean, onDelete: (id: string) => void, onBan: (userId: string) => void }) => {
+  const [showMenu, setShowMenu] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  const isMsgAdmin = msg.email === 'sadishekh671@gmail.com';
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setShowMenu(false);
+      }
+    };
+    if (showMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showMenu]);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(msg.message);
+    setCopied(true);
+    setTimeout(() => {
+      setCopied(false);
+      setShowMenu(false);
+    }, 2000);
+  };
+
   return (
-    <div className={cn("flex flex-col w-full group", isMe ? "items-end" : "items-start", !showHeader ? "mt-1" : "mt-4")}>
+    <div className={cn("flex flex-col w-full relative", isMe ? "items-end" : "items-start", !showHeader ? "mt-1" : "mt-4")}>
       {/* Admin X-RAY Vision Header */}
       {isAdmin && (
          <div className={cn("flex items-center gap-2 mb-1 z-10", isMe ? "mr-2" : "ml-2")}>
@@ -45,26 +75,83 @@ const ChatBubble = React.memo(({ msg, isMe, showHeader, isAdmin, onDelete, onBan
          <div className="flex items-center gap-2 mb-1.5 ml-1">
             <img src={msg.avatar_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${msg.user_id}`} alt="Avatar" className="w-5 h-5 rounded-full bg-theme-muted" />
             <span className="text-[10px] font-bold text-theme-text/50">{msg.username || 'Unknown User'}</span>
+            {isMsgAdmin && (
+              <span className="text-[9px] bg-yellow-500/20 border border-yellow-500/30 text-yellow-500 px-1.5 py-0.5 rounded font-black tracking-widest uppercase shadow-sm">👑 Admin</span>
+            )}
             <span className="text-[9px] text-theme-text/30">{new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
          </div>
       )}
       
-      <div className="flex items-center gap-2 max-w-full">
-        {/* Regular user delete button for own messages (Admin does not need this, they have the big red button above) */}
-        {isMe && !isAdmin && (
-          <button onClick={() => onDelete(msg.id)} className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 text-red-400 hover:text-red-500 hover:bg-red-500/10 rounded-full shrink-0" title="Delete Message">
-             <Trash2 className="w-3.5 h-3.5" />
-          </button>
+      <div className={cn("flex items-center gap-1.5 w-full", isMe ? "justify-end" : "justify-start")}>
+        {isMe && (
+          <div className="relative" ref={isMe ? menuRef : null}>
+            <button 
+              onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }} 
+              className="p-1.5 text-theme-text/40 hover:text-theme-text/80 rounded-full transition-colors active:bg-theme-muted mt-auto"
+            >
+              <MoreVertical className="w-4 h-4" />
+            </button>
+            {showMenu && (
+              <div className="absolute bottom-full mb-1 right-0 min-w-[140px] bg-theme-bg border border-theme-border rounded-xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 z-50">
+                <button onClick={(e) => { e.stopPropagation(); handleCopy(); }} className="w-full flex items-center gap-2 px-3 py-2.5 text-xs text-theme-text hover:bg-theme-muted/50 transition-colors text-left font-medium">
+                  {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
+                  {copied ? 'Copied!' : 'Copy Text'}
+                </button>
+                <div className="h-px bg-theme-border/50 w-full" />
+                <button onClick={(e) => { e.stopPropagation(); setShowMenu(false); onDelete(msg.id); }} className="w-full flex items-center gap-2 px-3 py-2.5 text-xs text-red-500 hover:bg-red-500/10 transition-colors text-left font-medium">
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Unsend
+                </button>
+              </div>
+            )}
+          </div>
         )}
         
-        <div className={cn(
-          "max-w-[85%] md:max-w-[70%] px-4 py-2 text-sm leading-relaxed whitespace-pre-wrap break-words relative",
-          isMe 
-          ? "bg-theme-accent-start text-white rounded-2xl rounded-tr-sm" 
-          : "bg-theme-card border border-theme-border/50 text-theme-text rounded-2xl rounded-tl-sm shadow-sm"
-        )}>
+        <div 
+          onClick={(e) => {
+             e.stopPropagation();
+             setShowMenu(!showMenu);
+          }}
+          className={cn(
+            "w-fit max-w-[85%] px-4 py-2 text-[15px] leading-relaxed whitespace-pre-wrap break-words relative cursor-pointer active:opacity-80 transition-opacity",
+            isMsgAdmin 
+              ? "bg-gradient-to-r from-[#2a020b] to-[#4C0519] text-[#e8c3a2] rounded-2xl shadow-lg border border-[#4C0519]/50" 
+              : isMe 
+                ? "bg-theme-accent-start text-white rounded-2xl rounded-tr-sm shadow-sm" 
+                : "bg-theme-card border border-theme-border/70 text-theme-text rounded-2xl rounded-tl-sm shadow-sm",
+            isMsgAdmin && isMe ? "rounded-tr-sm" : isMsgAdmin && !isMe ? "rounded-tl-sm" : ""
+          )}
+        >
           {msg.message}
         </div>
+
+        {!isMe && (
+          <div className="relative" ref={!isMe ? menuRef : null}>
+             <button 
+              onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }} 
+              className="p-1.5 text-theme-text/40 hover:text-theme-text/80 rounded-full transition-colors active:bg-theme-muted mt-auto"
+            >
+              <MoreVertical className="w-4 h-4" />
+            </button>
+            {showMenu && (
+              <div className="absolute bottom-full mb-1 left-0 min-w-[140px] bg-theme-bg border border-theme-border rounded-xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 z-50">
+                <button onClick={(e) => { e.stopPropagation(); handleCopy(); }} className="w-full flex items-center gap-2 px-3 py-2.5 text-xs text-theme-text hover:bg-theme-muted/50 transition-colors text-left font-medium">
+                  {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
+                  {copied ? 'Copied!' : 'Copy Text'}
+                </button>
+                {isAdmin && (
+                  <>
+                    <div className="h-px bg-theme-border/50 w-full" />
+                    <button onClick={(e) => { e.stopPropagation(); setShowMenu(false); onDelete(msg.id); }} className="w-full flex items-center gap-2 px-3 py-2.5 text-xs text-red-500 hover:bg-red-500/10 transition-colors text-left font-medium">
+                      <Trash2 className="w-3.5 h-3.5" />
+                      Delete
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {showHeader && isMe && (
@@ -313,7 +400,8 @@ export function Community() {
           user_id: user.id,
           message: msgText,
           username: profile.username,
-          avatar_url: profile.avatar_url
+          avatar_url: profile.avatar_url,
+          email: user.email
         }])
         .select()
         .single();
