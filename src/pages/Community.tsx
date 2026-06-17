@@ -156,31 +156,45 @@ const ChatBubble = React.memo(({ msg, isMe, showHeader, isAdmin, onDelete, onBan
 
 const ChatInput = React.memo(({ profile, onSendMessage }: { profile: ProfileData | null, onSendMessage: (msg: string) => void }) => {
   const [newMessage, setNewMessage] = useState('');
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSend = () => {
     if (!newMessage.trim()) return;
     onSendMessage(newMessage.trim());
     setNewMessage('');
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+    }
+  };
+
+  const handleInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setNewMessage(e.target.value);
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 160)}px`;
+    }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="max-w-4xl mx-auto relative flex items-center">
-      <input 
-        type="text"
+    <div className="max-w-4xl mx-auto relative flex items-end">
+      <textarea 
+        ref={textareaRef}
+        rows={1}
         placeholder={`Message as ${profile?.username}...`}
         value={newMessage}
-        onChange={(e) => setNewMessage(e.target.value)}
-        className="w-full bg-theme-muted/30 border border-theme-border rounded-full py-3.5 pl-6 pr-14 text-sm focus:outline-none focus:border-theme-accent-end transition-all text-theme-text"
+        onChange={handleInput}
+        className="w-full bg-theme-muted/30 border border-theme-border rounded-[24px] py-[13px] pl-6 pr-[52px] text-[15px] leading-[20px] focus:outline-none focus:border-theme-accent-end transition-all text-theme-text resize-none overflow-y-auto block"
+        style={{ minHeight: '48px', maxHeight: '160px' }}
       />
       <button 
-        type="submit"
+        type="button"
+        onClick={handleSend}
         disabled={!newMessage.trim()}
-        className="absolute right-2 p-2 bg-theme-accent-end text-white rounded-full disabled:opacity-50 hover:scale-105 transition-transform transform-gpu will-change-transform"
+        className="absolute right-2 bottom-[8px] w-[32px] h-[32px] flex items-center justify-center bg-theme-accent-end text-white rounded-full disabled:opacity-50 hover:scale-105 transition-transform transform-gpu will-change-transform shrink-0"
       >
-        <Send className="w-4 h-4 ml-0.5" />
+        <Send className="w-4 h-4 -ml-[1px] mt-[1px]" />
       </button>
-    </form>
+    </div>
   );
 });
 
