@@ -19,7 +19,6 @@ interface Message {
   created_at: string;
   username: string;
   avatar_url: string;
-  email?: string;
 }
 
 const AVATAR_SEEDS = ['bot1', 'bot2', 'bot3', 'bot4', 'bot5', 'bot6', 'bot7', 'bot8'];
@@ -29,7 +28,7 @@ const ChatBubble = React.memo(({ msg, isMe, showHeader, isAdmin, onDelete, onBan
   const [copied, setCopied] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  const isMsgAdmin = msg.email === 'sadishekh671@gmail.com';
+  const isMsgAdmin = msg.avatar_url?.includes('#admin') || false;
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -56,21 +55,6 @@ const ChatBubble = React.memo(({ msg, isMe, showHeader, isAdmin, onDelete, onBan
 
   return (
     <div className={cn("flex flex-col w-full relative", isMe ? "items-end" : "items-start", !showHeader ? "mt-1" : "mt-4")}>
-      {/* Admin X-RAY Vision Header */}
-      {isAdmin && (
-         <div className={cn("flex items-center gap-2 mb-1 z-10", isMe ? "mr-2" : "ml-2")}>
-            <span className="text-[9px] font-mono text-red-500/60 bg-red-500/10 px-1 py-0.5 rounded">{msg.user_id}</span>
-            {!isMe && (
-              <button onClick={() => onBan(msg.user_id)} className="text-[10px] text-red-500 hover:bg-red-500/20 px-1.5 py-0.5 rounded flex items-center gap-1 font-bold bg-red-500/10 transition-colors">
-                 <Ban className="w-3 h-3" /> Ban 🚫
-              </button>
-            )}
-            <button onClick={() => onDelete(msg.id)} className="text-[10px] text-red-500 hover:bg-red-500/20 px-1.5 py-0.5 rounded flex items-center gap-1 font-bold bg-red-500/10 transition-colors">
-               <Trash2 className="w-3 h-3" /> Delete 🗑️
-            </button>
-         </div>
-      )}
-
       {showHeader && !isMe && (
          <div className="flex items-center gap-2 mb-1.5 ml-1">
             <img src={msg.avatar_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${msg.user_id}`} alt="Avatar" className="w-5 h-5 rounded-full bg-theme-muted" />
@@ -92,7 +76,7 @@ const ChatBubble = React.memo(({ msg, isMe, showHeader, isAdmin, onDelete, onBan
               <MoreVertical className="w-4 h-4" />
             </button>
             {showMenu && (
-              <div className="absolute bottom-full mb-1 right-0 min-w-[140px] bg-theme-bg border border-theme-border rounded-xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 z-50">
+              <div className="absolute top-full mt-1 right-0 min-w-[140px] bg-theme-bg border border-theme-border rounded-xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 z-[100]">
                 <button onClick={(e) => { e.stopPropagation(); handleCopy(); }} className="w-full flex items-center gap-2 px-3 py-2.5 text-xs text-theme-text hover:bg-theme-muted/50 transition-colors text-left font-medium">
                   {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
                   {copied ? 'Copied!' : 'Copy Text'}
@@ -108,12 +92,8 @@ const ChatBubble = React.memo(({ msg, isMe, showHeader, isAdmin, onDelete, onBan
         )}
         
         <div 
-          onClick={(e) => {
-             e.stopPropagation();
-             setShowMenu(!showMenu);
-          }}
           className={cn(
-            "w-fit max-w-[85%] px-4 py-2 text-[15px] leading-relaxed whitespace-pre-wrap break-words relative cursor-pointer active:opacity-80 transition-opacity",
+            "w-fit max-w-[85%] px-4 py-2 text-[15px] leading-relaxed whitespace-pre-wrap break-words relative",
             isMsgAdmin 
               ? "bg-gradient-to-r from-[#2a020b] to-[#4C0519] text-[#e8c3a2] rounded-2xl shadow-lg border border-[#4C0519]/50" 
               : isMe 
@@ -134,13 +114,18 @@ const ChatBubble = React.memo(({ msg, isMe, showHeader, isAdmin, onDelete, onBan
               <MoreVertical className="w-4 h-4" />
             </button>
             {showMenu && (
-              <div className="absolute bottom-full mb-1 left-0 min-w-[140px] bg-theme-bg border border-theme-border rounded-xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 z-50">
+              <div className="absolute top-full mt-1 left-0 min-w-[140px] bg-theme-bg border border-theme-border rounded-xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 z-[100]">
                 <button onClick={(e) => { e.stopPropagation(); handleCopy(); }} className="w-full flex items-center gap-2 px-3 py-2.5 text-xs text-theme-text hover:bg-theme-muted/50 transition-colors text-left font-medium">
                   {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
                   {copied ? 'Copied!' : 'Copy Text'}
                 </button>
                 {isAdmin && (
                   <>
+                    <div className="h-px bg-theme-border/50 w-full" />
+                    <button onClick={(e) => { e.stopPropagation(); setShowMenu(false); onBan(msg.user_id); }} className="w-full flex items-center gap-2 px-3 py-2.5 text-xs text-red-500 hover:bg-red-500/10 transition-colors text-left font-medium">
+                      <Ban className="w-3.5 h-3.5" />
+                      Ban User
+                    </button>
                     <div className="h-px bg-theme-border/50 w-full" />
                     <button onClick={(e) => { e.stopPropagation(); setShowMenu(false); onDelete(msg.id); }} className="w-full flex items-center gap-2 px-3 py-2.5 text-xs text-red-500 hover:bg-red-500/10 transition-colors text-left font-medium">
                       <Trash2 className="w-3.5 h-3.5" />
@@ -394,14 +379,16 @@ export function Community() {
     setNewMessage(''); // optimistic clear
 
     try {
+      const isAdminUser = user.email === 'sadishekh671@gmail.com';
+      const finalAvatarUrl = isAdminUser ? `${profile.avatar_url}#admin` : profile.avatar_url;
+
       const { data, error } = await supabase
         .from('community_messages')
         .insert([{
           user_id: user.id,
           message: msgText,
           username: profile.username,
-          avatar_url: profile.avatar_url,
-          email: user.email
+          avatar_url: finalAvatarUrl
         }])
         .select()
         .single();
@@ -562,7 +549,7 @@ export function Community() {
                  />;
                })
             )}
-            <div ref={messagesEndRef} className="h-2 shrink-0" />
+            <div ref={messagesEndRef} className="h-20 shrink-0" />
           </main>
 
           <footer className="p-4 border-t border-theme-border bg-theme-bg shrink-0">
