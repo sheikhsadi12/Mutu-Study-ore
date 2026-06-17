@@ -39,8 +39,10 @@ export function Comments({ noteId }: { noteId: string }) {
   
   const [selectedAdminProfile, setSelectedAdminProfile] = useState<NoteComment | null>(null);
   const [adminUserStatus, setAdminUserStatus] = useState<{is_banned: boolean, suspended_until: string | null} | null>(null);
+  const [isCommentsDisabled, setIsCommentsDisabled] = useState(false);
 
   const subscriptionRef = useRef<any>(null);
+  const controlsSubscriptionRef = useRef<any>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const isAdmin = user?.email === 'sadishekh671@gmail.com';
@@ -76,12 +78,29 @@ export function Comments({ noteId }: { noteId: string }) {
   useEffect(() => {
     fetchData();
     setupSubscriptions();
+    fetchSystemControls();
+    
+    controlsSubscriptionRef.current = supabase.channel(`comments_controls_updates`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'system_controls' }, () => {
+         fetchSystemControls();
+      }).subscribe();
+
     return () => {
       if (subscriptionRef.current) {
         supabase.removeChannel(subscriptionRef.current);
       }
+      if (controlsSubscriptionRef.current) {
+        supabase.removeChannel(controlsSubscriptionRef.current);
+      }
     };
   }, [noteId, user?.id]);
+
+  const fetchSystemControls = async () => {
+    try {
+      const { data } = await supabase.from('system_controls').select('is_comments_disabled').eq('id', 1).single();
+      if (data) setIsCommentsDisabled(data.is_comments_disabled);
+    } catch(e) { console.warn("Failed to fetch system controls", e); }
+  };
 
   useEffect(() => {
     if (user?.email === 'sadishekh671@gmail.com' && selectedAdminProfile) {
@@ -327,7 +346,11 @@ export function Comments({ noteId }: { noteId: string }) {
                </button>
             </div>
           )}
-          {isRestricted ? (
+          {isCommentsDisabled && !isAdmin ? (
+             <div className="w-full border border-theme-border/50 text-theme-text/60 text-sm font-bold p-3 rounded-xl flex items-center justify-center gap-2 text-center opacity-70">
+                🔒 Comments are temporarily closed for this topic.
+             </div>
+          ) : isRestricted ? (
              <div className="w-full bg-red-500/10 border border-red-500/20 text-red-500 text-sm font-bold p-3 rounded-xl flex items-center justify-center gap-2 text-center">
                 <Ban className="w-5 h-5 shrink-0" />
                 Restricted from interactions.

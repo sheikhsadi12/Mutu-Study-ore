@@ -194,6 +194,7 @@ export function Community() {
 
   const [selectedAdminProfile, setSelectedAdminProfile] = useState<Message | null>(null);
   const [adminUserStatus, setAdminUserStatus] = useState<{is_banned: boolean, suspended_until: string | null} | null>(null);
+  const [isChatDisabled, setIsChatDisabled] = useState(false);
 
   useEffect(() => {
     if (user?.email === 'sadishekh671@gmail.com' && selectedAdminProfile) {
@@ -207,8 +208,29 @@ export function Community() {
   }, [selectedAdminProfile, user?.email]);
 
   const subscriptionRef = useRef<any>(null);
+  const controlsSubscriptionRef = useRef<any>(null);
 
   const isAdmin = user?.email === 'sadishekh671@gmail.com';
+
+  const fetchSystemControls = async () => {
+    try {
+      const { data } = await supabase.from('system_controls').select('is_chat_disabled').eq('id', 1).single();
+      if (data) setIsChatDisabled(data.is_chat_disabled);
+    } catch(e) { console.warn("Could not fetch system controls", e); }
+  };
+
+  useEffect(() => {
+    fetchSystemControls();
+    
+    controlsSubscriptionRef.current = supabase.channel('chat_system_controls')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'system_controls' }, (payload) => {
+         fetchSystemControls();
+      }).subscribe();
+
+    return () => {
+      if (controlsSubscriptionRef.current) supabase.removeChannel(controlsSubscriptionRef.current);
+    }
+  }, []);
 
   const handleDeleteMessage = React.useCallback(async (messageId: string) => {
     try {
@@ -619,7 +641,11 @@ export function Community() {
           </main>
 
           <footer className="sticky bottom-0 bg-theme-bg border-t border-theme-border p-3 md:p-4 shrink-0 z-20 w-full mb-safe">
-             {profile?.is_banned || (profile?.suspended_until && new Date(profile.suspended_until) > new Date()) ? (
+             {isChatDisabled && !isAdmin ? (
+                <div className="max-w-4xl mx-auto border border-theme-border/50 text-theme-text/60 text-sm font-bold p-4 rounded-xl flex items-center justify-center gap-2 text-center transform-gpu will-change-transform opacity-70">
+                   🔒 Community Chat is temporarily turned OFF by the Admin.
+                </div>
+             ) : profile?.is_banned || (profile?.suspended_until && new Date(profile.suspended_until) > new Date()) ? (
                 <div className="max-w-4xl mx-auto bg-red-500/10 border border-red-500/20 text-red-500 text-sm font-bold p-4 rounded-xl flex items-center justify-center gap-2 text-center transform-gpu will-change-transform">
                    <Ban className="w-5 h-5 shrink-0" />
                    You have been restricted from the community for violating rules.

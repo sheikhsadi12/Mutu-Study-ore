@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, ShieldAlert } from 'lucide-react';
 
 export function Login() {
   const navigate = useNavigate();
@@ -15,13 +15,36 @@ export function Login() {
   const [isResetPassword, setIsResetPassword] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
+  const [isLoginDisabled, setIsLoginDisabled] = useState(false);
+  const [loadingMaintenance, setLoadingMaintenance] = useState(true);
+  const [adminBypass, setAdminBypass] = useState(false);
+
   useEffect(() => {
+    fetchSystemControls();
     supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
         navigate(from, { replace: true });
       }
     });
   }, [navigate, from]);
+
+  const fetchSystemControls = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('system_controls')
+        .select('is_login_disabled')
+        .eq('id', 1)
+        .single();
+      
+      if (!error && data) {
+        setIsLoginDisabled(data.is_login_disabled);
+      }
+    } catch (e) {
+      console.warn('Failed to check maintenance mode', e);
+    } finally {
+      setLoadingMaintenance(false);
+    }
+  };
 
   const handleLogin = async () => {
     // Check if running inside the AI Studio iframe
@@ -79,9 +102,32 @@ export function Login() {
     <div className="min-h-screen flex items-center justify-center bg-theme-bg p-4 md:p-6 flex-col">
       <div className="w-full max-w-md card-base shadow-2xl p-6 md:p-10 border border-theme-border/50 bg-theme-muted/10 backdrop-blur rounded-[20px] text-center">
         <h1 className="text-3xl md:text-4xl font-heading font-black text-theme-accent-start mb-2 tracking-tight">MUTU STUDY</h1>
-        <p className="text-sm md:text-base text-theme-text/70 mb-8 font-medium">Please sign in to continue.</p>
         
-        {!isResetPassword && (
+        {loadingMaintenance ? (
+           <div className="flex justify-center p-8"><div className="w-6 h-6 border-2 border-theme-accent-start border-t-transparent rounded-full animate-spin"></div></div>
+        ) : isLoginDisabled && !adminBypass ? (
+           <div className="py-8 animate-in fade-in zoom-in-95 duration-500">
+             <div className="bg-red-500/10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6 border border-red-500/20">
+               <ShieldAlert className="w-8 h-8 text-red-500" />
+             </div>
+             <h2 className="text-xl md:text-2xl font-bold text-theme-text mb-4">System Maintenance</h2>
+             <p className="text-theme-text/70 mb-8 leading-relaxed">
+               Login is temporarily suspended for system upgrades. Please check back later.
+             </p>
+             <button 
+                onClick={() => setAdminBypass(true)} 
+                className="opacity-0 hover:opacity-100 transition-opacity text-[10px] text-theme-text/30 hover:text-theme-text/60 mt-8 uppercase font-bold"
+             >
+                Admin Bypass
+             </button>
+           </div>
+        ) : (
+          <>
+            <p className="text-sm md:text-base text-theme-text/70 mb-8 font-medium">
+               {adminBypass ? <span className="text-red-500 font-bold uppercase tracking-wider text-xs">Admin Bypass Mode</span> : "Please sign in to continue."}
+            </p>
+            
+            {!isResetPassword && (
           <>
             <button
               onClick={handleLogin}
@@ -201,6 +247,8 @@ export function Login() {
         <p className="mt-8 text-[10px] md:text-xs text-theme-text/40 tracking-wider uppercase font-bold">
           Role-Based Access Controlled
         </p>
+        </>
+        )}
       </div>
     </div>
   );

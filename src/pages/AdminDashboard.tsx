@@ -1,10 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
-import { ArrowLeft, Ban, CheckCircle, Search, ShieldAlert, Users, Trash2 } from 'lucide-react';
+import { ArrowLeft, Ban, CheckCircle, Search, ShieldAlert, Users, Trash2, Settings, Power } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 interface AdminUser {
-
   id: string;
   email: string;
   username: string;
@@ -12,14 +11,29 @@ interface AdminUser {
   is_banned?: boolean; // From profiles join or manual merge
 }
 
+interface SystemControls {
+  id: number;
+  is_login_disabled: boolean;
+  is_chat_disabled: boolean;
+  is_comments_disabled: boolean;
+}
+
 export function AdminDashboard() {
   const navigate = useNavigate();
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [systemControls, setSystemControls] = useState<SystemControls>({
+    id: 1,
+    is_login_disabled: false,
+    is_chat_disabled: false,
+    is_comments_disabled: false,
+  });
+  const [loadingControls, setLoadingControls] = useState(true);
 
   useEffect(() => {
     fetchUsers();
+    fetchSystemControls();
 
     const subscription = supabase
       .channel('admin_user_list_changes')
@@ -32,10 +46,66 @@ export function AdminDashboard() {
       )
       .subscribe();
 
+    const controlsSubscription = supabase
+      .channel('system_controls_changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'system_controls' },
+        (payload) => {
+          fetchSystemControls();
+        }
+      )
+      .subscribe();
+
     return () => {
       supabase.removeChannel(subscription);
+      supabase.removeChannel(controlsSubscription);
     };
   }, []);
+
+  const fetchSystemControls = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('system_controls')
+        .select('*')
+        .eq('id', 1)
+        .single();
+      
+      if (error && error.code !== 'PGRST116') {
+        throw error;
+      }
+      
+      if (data) {
+        setSystemControls(data);
+      }
+    } catch (e) {
+      console.error('Failed to fetch system controls', e);
+    } finally {
+      setLoadingControls(false);
+    }
+  };
+
+  const toggleControl = async (field: keyof SystemControls) => {
+    try {
+      const newValue = !systemControls[field];
+      
+      // Optimitistic update
+      setSystemControls(prev => ({ ...prev, [field]: newValue }));
+
+      const { error } = await supabase
+        .from('system_controls')
+        .upsert({ id: 1, [field]: newValue });
+
+      if (error) {
+        throw error;
+      }
+    } catch (e: any) {
+      console.error(`Failed to toggle ${field}`, e);
+      // Revert optimistic update
+      fetchSystemControls();
+      alert('Failed to apply system control change.');
+    }
+  };
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -144,6 +214,69 @@ export function AdminDashboard() {
       </header>
 
       <main className="p-6 max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
+        
+        {/* System Maintence Controls */}
+        <div className="bg-theme-card border border-theme-border p-6 rounded-[24px] shadow-sm">
+          <div className="flex items-center gap-3 mb-6 border-b border-theme-border/50 pb-4">
+            <Settings className="w-6 h-6 text-theme-accent-end" />
+            <h2 className="text-xl font-heading font-black text-theme-text uppercase tracking-wide">System Maintenance Kill-Switches</h2>
+          </div>
+          
+          {loadingControls ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="w-6 h-6 border-2 border-theme-accent-start border-t-transparent rounded-full animate-spin"></div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {[
+                {
+                  id: 'is_login_disabled',
+                  label: 'Disable New Logins / Registration',
+                  icon: <Power className="w-5 h-5" />,
+                  danger: true
+                },
+                {
+                  id: 'is_chat_disabled',
+                  label: 'Disable Community Chat',
+                  icon: <Power className="w-5 h-5" />,
+                  danger: false
+                },
+                {
+                  id: 'is_comments_disabled',
+                  label: 'Disable Topic Comments',
+                  icon: <Power className="w-5 h-5" />,
+                  danger: false
+                }
+              ].map((control) => {
+                const isActive = systemControls[control.id as keyof SystemControls];
+                return (
+                  <div key={control.id} className={`flex flex-col gap-4 p-5 rounded-2xl border transition-all ${isActive ? 'bg-red-500/5 border-red-500/20' : 'bg-theme-bg border-theme-border'}`}>
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex items-center gap-3">
+                        <div className={`p-2 rounded-full ${isActive ? 'bg-red-500/20 text-red-500' : 'bg-theme-muted text-theme-text/70'}`}>
+                           {isActive ? <Ban className="w-5 h-5" /> : control.icon}
+                        </div>
+                        <span className={`font-bold text-sm ${isActive ? 'text-red-500' : 'text-theme-text'}`}>
+                           {control.label}
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => toggleControl(control.id as keyof SystemControls)}
+                        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-theme-accent-start focus:ring-offset-2 focus:ring-offset-theme-bg ${isActive ? 'bg-red-500' : 'bg-theme-border'}`}
+                      >
+                        <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${isActive ? 'translate-x-5' : 'translate-x-0'}`} />
+                      </button>
+                    </div>
+                    {isActive && (
+                      <p className="text-xs text-red-500/80 font-bold uppercase tracking-wider">Currently Disabled</p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
         <div className="flex flex-col md:flex-row items-center gap-6 justify-between bg-theme-card border border-theme-border p-6 rounded-[24px] shadow-sm">
            <div className="flex items-center gap-4 text-theme-text">
               <div className="w-14 h-14 rounded-full bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
