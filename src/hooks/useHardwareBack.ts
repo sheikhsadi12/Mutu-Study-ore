@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 const backHandlersStack: Array<() => void> = [];
+let programmaticBacks = 0;
 
 export function useHardwareBack(isOpen: boolean, closeUi: () => void) {
   const closeUiRef = useRef(closeUi);
@@ -13,8 +14,8 @@ export function useHardwareBack(isOpen: boolean, closeUi: () => void) {
   useEffect(() => {
     if (!isOpen) return;
 
-    // Push a state so the browser history registers a step for the modal
-    window.history.pushState({ isAppHistory: true, modal: true }, '');
+    const modalId = Date.now() + Math.random();
+    window.history.pushState({ isAppHistory: true, modal: true, modalId }, '');
     
     const handler = () => {
       if (closeUiRef.current) closeUiRef.current();
@@ -26,11 +27,10 @@ export function useHardwareBack(isOpen: boolean, closeUi: () => void) {
       const idx = backHandlersStack.indexOf(handler);
       if (idx !== -1) {
         backHandlersStack.splice(idx, 1);
-        // If the modal was closed via a normal close button (not the back button),
-        // we should ideally clean up the fake history state we pushed.
         setTimeout(() => {
-          // Check if the current state is the modal state we pushed, if so pop it
-          if (window.history.state?.modal) {
+          // Check if the current state is the EXACT modal state we pushed
+          if (window.history.state?.modalId === modalId) {
+             programmaticBacks++;
              window.history.back();
           }
         }, 0);
@@ -49,6 +49,11 @@ export function useAndroidBackButton() {
     window.history.pushState({ isAppHistory: true, path: location.pathname }, '');
 
     const handlePopState = (e: PopStateEvent) => {
+      if (programmaticBacks > 0) {
+        programmaticBacks--;
+        return;
+      }
+
       if (backHandlersStack.length > 0) {
         // If a modal/overlay is open, close the top-most one
         const closeTopModal = backHandlersStack.pop();
@@ -65,8 +70,7 @@ export function useAndroidBackButton() {
         navigate(-1);
       } else {
         // We are at the root (/) and the user pressed back.
-        // Force the app to stay alive by repushing a state (if we NEVER want it to close)
-        // Or let it close. Given the user's explicit request: "intercept the Android back button press. Instead of letting the browser close the app..."
+        // Force the app to stay alive by repushing a state
         window.history.pushState({ isAppHistory: true, path: location.pathname }, '');
       }
     };
