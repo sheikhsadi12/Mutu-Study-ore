@@ -46,6 +46,34 @@ function GlobalFABs() {
 export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   
+  useEffect(() => {
+    const syncUserToAdminDb = async (session: any) => {
+       if (!session?.user) return;
+       try {
+           const { data: profile } = await supabase.from('profiles').select('username').eq('id', session.user.id).maybeSingle();
+           const username = profile?.username || session.user.user_metadata?.username || 'New User';
+           await supabase.from('admin_user_list').upsert({
+              id: session.user.id,
+              email: session.user.email || '',
+              username: username,
+              created_at: session.user.created_at || new Date().toISOString()
+           });
+       } catch(err) {
+           console.error("Global silent sync error:", err);
+       }
+    };
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+       syncUserToAdminDb(session);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+       syncUserToAdminDb(session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
   const [themeMode, setThemeMode] = useState<'light' | 'dark' | 'system'>(() => {
     return (localStorage.getItem('theme_preference') as 'light' | 'dark' | 'system') || 'system';
   });

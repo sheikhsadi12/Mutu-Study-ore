@@ -20,6 +20,21 @@ export function AdminDashboard() {
 
   useEffect(() => {
     fetchUsers();
+
+    const subscription = supabase
+      .channel('admin_user_list_changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'admin_user_list' },
+        (payload) => {
+          fetchUsers(); // Refresh the list when changes occur
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(subscription);
+    };
   }, []);
 
   const fetchUsers = async () => {

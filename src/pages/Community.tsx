@@ -23,7 +23,7 @@ interface Message {
 
 const AVATAR_SEEDS = ['bot1', 'bot2', 'bot3', 'bot4', 'bot5', 'bot6', 'bot7', 'bot8'];
 
-const ChatBubble = React.memo(({ msg, isMe, showHeader, isAdmin, onDelete, onBan }: { msg: Message, isMe: boolean, showHeader: boolean, isAdmin: boolean, onDelete: (id: string) => void, onBan: (userId: string) => void }) => {
+const ChatBubble = React.memo(({ msg, isMe, showHeader, isAdmin, onDelete, onBan, onViewProfile }: { msg: Message, isMe: boolean, showHeader: boolean, isAdmin: boolean, onDelete: (id: string) => void, onBan: (userId: string) => void, onViewProfile: (msg: Message) => void }) => {
   const [showMenu, setShowMenu] = useState(false);
   const [copied, setCopied] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -122,6 +122,11 @@ const ChatBubble = React.memo(({ msg, isMe, showHeader, isAdmin, onDelete, onBan
                 {isAdmin && (
                   <>
                     <div className="h-px bg-theme-border/50 w-full" />
+                    <button onClick={(e) => { e.stopPropagation(); setShowMenu(false); onViewProfile(msg); }} className="w-full flex items-center gap-2 px-3 py-2.5 text-xs text-theme-text hover:bg-theme-muted/50 transition-colors text-left font-medium">
+                      <User className="w-3.5 h-3.5" />
+                      View Profile
+                    </button>
+                    <div className="h-px bg-theme-border/50 w-full" />
                     <button onClick={(e) => { e.stopPropagation(); setShowMenu(false); onBan(msg.user_id); }} className="w-full flex items-center gap-2 px-3 py-2.5 text-xs text-red-500 hover:bg-red-500/10 transition-colors text-left font-medium">
                       <Ban className="w-3.5 h-3.5" />
                       Ban User
@@ -166,6 +171,8 @@ export function Community() {
   const [isLoading, setIsLoading] = useState(true);
   const scrollContainerRef = useRef<HTMLElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const [selectedAdminProfile, setSelectedAdminProfile] = useState<Message | null>(null);
 
   const subscriptionRef = useRef<any>(null);
 
@@ -292,12 +299,7 @@ export function Community() {
       if (error) throw error;
       
       try {
-        await supabase.from('admin_user_list').upsert({
-           id: user.id,
-           email: user.email || '',
-           username: newUsername.trim(),
-           created_at: new Date().toISOString()
-        });
+        await supabase.from('admin_user_list').update({ username: newUsername.trim() }).eq('id', user.id);
       } catch(syncErr) {
         console.error("Admin user list sync error:", syncErr);
       }
@@ -557,6 +559,7 @@ export function Community() {
                    isAdmin={isAdmin}
                    onDelete={handleDeleteMessage}
                    onBan={handleBanUser}
+                   onViewProfile={setSelectedAdminProfile}
                  />;
                })
             )}
@@ -589,6 +592,57 @@ export function Community() {
             )}
           </footer>
         </>
+      )}
+
+      {/* Admin Profile Modal */}
+      {isAdmin && selectedAdminProfile && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-[200]">
+          <div className="bg-theme-bg/90 backdrop-blur-md border border-theme-border rounded-3xl p-6 w-full max-w-sm shadow-2xl relative animate-in fade-in zoom-in-95">
+             <button onClick={() => setSelectedAdminProfile(null)} className="absolute top-4 right-4 p-2 rounded-full hover:bg-theme-muted transition-colors text-theme-text/60">
+                <X className="w-5 h-5" />
+             </button>
+             
+             <div className="flex flex-col items-center mt-4">
+                <img src={selectedAdminProfile.avatar_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${selectedAdminProfile.user_id}`} alt="Avatar" className="w-24 h-24 rounded-full bg-theme-muted mb-4 border-4 border-theme-bg shadow-lg" />
+                <h3 className="text-xl font-bold text-theme-text mb-1">{selectedAdminProfile.username || 'Unknown User'}</h3>
+                <p className="text-xs text-theme-text/40 font-mono bg-theme-muted px-2 py-1 rounded-md mb-8 select-all">{selectedAdminProfile.user_id}</p>
+                
+                <div className="w-full space-y-3">
+                   <button 
+                      onClick={async () => {
+                         try {
+                           await supabase.from('profiles').update({ is_banned: true }).eq('id', selectedAdminProfile.user_id);
+                           setSelectedAdminProfile(null);
+                           // Force refresh messages so any UI updates happen if necessary, though it won't retroactively hide them without page reload or explicit filtering
+                         } catch (err) { console.error(err); }
+                      }}
+                      className="w-full bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-600 border border-yellow-500/30 rounded-xl py-3 font-bold flex items-center justify-center gap-2 transition-all shadow-sm"
+                   >
+                      <Ban className="w-4 h-4" /> ⏱️ Suspend User
+                   </button>
+                   <button 
+                      onClick={async () => {
+                         if (!confirm("Are you sure you want to permanent kick and wipe their chat history?")) return;
+                         try {
+                           await supabase.from('profiles').update({ is_banned: true }).eq('id', selectedAdminProfile.user_id);
+                           await supabase.from('community_messages').delete().eq('user_id', selectedAdminProfile.user_id);
+                           setSelectedAdminProfile(null);
+                         } catch (err) { console.error(err); }
+                      }}
+                      className="w-full bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/30 rounded-xl py-3 font-bold flex items-center justify-center gap-2 transition-all shadow-sm"
+                   >
+                      <Trash2 className="w-4 h-4" /> 🚫 Permanent Kick & Wipe
+                   </button>
+                   <button 
+                      onClick={() => setSelectedAdminProfile(null)}
+                      className="w-full mt-2 text-theme-text/60 hover:text-theme-text/90 font-medium py-2 rounded-xl hover:bg-theme-muted/50 transition-colors"
+                   >
+                      Close
+                   </button>
+                </div>
+             </div>
+          </div>
+        </div>
       )}
     </div>
   );
