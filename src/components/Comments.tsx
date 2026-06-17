@@ -4,6 +4,7 @@ import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { supabase } from "../supabaseClient";
 import { cn } from "../lib/utils";
 import { TextFormatter } from "./TextFormatter";
+import { useHardwareBack } from "../hooks/useHardwareBack";
 
 const isArabic = (text: string) => /[\u0600-\u06FF]/.test(text || '');
 const getTextClass = (text: string) => isArabic(text) ? 'font-arabic text-[15px] leading-relaxed text-right dir-rtl' : 'font-sans text-[15px]';
@@ -41,6 +42,9 @@ export function Comments({ noteId }: { noteId: string }) {
   const [selectedAdminProfile, setSelectedAdminProfile] = useState<NoteComment | null>(null);
   const [adminUserStatus, setAdminUserStatus] = useState<{is_banned: boolean, suspended_until: string | null} | null>(null);
   const [isCommentsDisabled, setIsCommentsDisabled] = useState(false);
+
+  useHardwareBack(isOpen, () => setIsOpen(false));
+  useHardwareBack(selectedAdminProfile !== null, () => setSelectedAdminProfile(null));
 
   const subscriptionRef = useRef<any>(null);
   const controlsSubscriptionRef = useRef<any>(null);

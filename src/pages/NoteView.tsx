@@ -7,6 +7,7 @@ import { Note } from "../types";
 import { supabase } from "../supabaseClient";
 import { DynamicCodeViewer } from "../components/DynamicCodeViewer";
 import { Comments } from "../components/Comments";
+import { useHardwareBack } from "../hooks/useHardwareBack";
 
 interface NoteViewProps {
   note: Note;
@@ -18,6 +19,11 @@ export function NoteView({ note, onBack, isDarkMode = false }: NoteViewProps) {
   const [fullNote, setFullNote] = useState<Note | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Trap back button to exit the NoteView content view
+  useHardwareBack(true, onBack);
+  // Trap back button to exit Fullscreen without exiting NoteView
+  useHardwareBack(isFullscreen, () => setIsFullscreen(false));
 
   useEffect(() => {
     document.body.classList.add("note-view-open");

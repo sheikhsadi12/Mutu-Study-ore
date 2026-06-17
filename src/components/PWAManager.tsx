@@ -17,27 +17,6 @@ export function PWAManager() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Handle hardware back button
-  useEffect(() => {
-    // If we're on a child page, push a trap state so the first back button click
-    // fires popstate without exiting the app
-    if (location.pathname !== '/' && location.pathname !== '/login') {
-       window.history.pushState({ pwaTrap: true }, '');
-    }
-
-    const handlePopState = (e: PopStateEvent) => {
-      // The browser's back button was pressed.
-      // If we pushed our trap state, the popstate event will fire.
-      if (location.pathname !== '/' && location.pathname !== '/login') {
-         // Instead of exiting, go back in React Router's history or go to root
-         navigate(-1);
-      }
-    };
-
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
-  }, [location.pathname, navigate]);
-
   // Handle PWA Install Prompt
   useEffect(() => {
     const handleBeforeInstallPrompt = (e: Event) => {

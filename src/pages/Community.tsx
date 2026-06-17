@@ -6,6 +6,7 @@ import { User as AuthUser } from '@supabase/supabase-js';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { cn } from '../lib/utils';
 import { TextFormatter } from '../components/TextFormatter';
+import { useHardwareBack } from '../hooks/useHardwareBack';
 
 const isArabic = (text: string) => /[\u0600-\u06FF]/.test(text || '');
 const getTextClass = (text: string) => isArabic(text) ? 'font-arabic text-[15px] leading-relaxed text-right dir-rtl' : 'font-sans text-[15px]';
@@ -196,6 +197,14 @@ export function Community() {
   const [selectedAdminProfile, setSelectedAdminProfile] = useState<Message | null>(null);
   const [adminUserStatus, setAdminUserStatus] = useState<{is_banned: boolean, suspended_until: string | null} | null>(null);
   const [isChatDisabled, setIsChatDisabled] = useState(false);
+
+  useHardwareBack(showSetup, () => {
+    // We cannot just close setup if they don't have a profile, otherwise they can't chat.
+    // If they press back on setup with no profile, maybe send them back to home?
+    if (!profile?.username) navigate('/');
+    else setShowSetup(false);
+  });
+  useHardwareBack(selectedAdminProfile !== null, () => setSelectedAdminProfile(null));
 
   const subscriptionRef = useRef<any>(null);
   const controlsSubscriptionRef = useRef<any>(null);
