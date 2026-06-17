@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
-import { ArrowLeft, Ban, CheckCircle, Search, ShieldAlert, Users, Trash2, Settings, Power } from 'lucide-react';
+import { ArrowLeft, Ban, CheckCircle, Search, ShieldAlert, Users, Trash2, Settings, Power, AlertTriangle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 interface AdminUser {
