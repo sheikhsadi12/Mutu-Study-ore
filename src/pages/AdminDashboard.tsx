@@ -35,72 +35,135 @@ export function AdminDashboard() {
   const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null);
 
   useEffect(() => {
+    let isMounted = true;
+
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setCurrentUserEmail(session?.user?.email || null);
+      if (isMounted) {
+        setCurrentUserEmail(session?.user?.email || null);
+      }
     });
-    fetchUsers();
-    fetchSystemControls();
 
-    const subscription = supabase
-      .channel('public:profiles')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'profiles' },
-        (payload) => {
-          if (payload.eventType === 'INSERT') {
-            const newProfile = payload.new;
-            const newUser: AdminUser = {
-              id: newProfile.id,
-              full_name: newProfile.full_name || 'New User',
-              email: newProfile.email || '',
-              avatar_url: newProfile.avatar_url,
-              created_at: newProfile.created_at || new Date().toISOString(),
-              is_banned: newProfile.is_banned || false,
-              is_admin: newProfile.is_admin || false,
-            };
+    const loadInitialData = async () => {
+      setLoading(true);
+      try {
+        const { data: profiles, error: profilesError } = await supabase
+          .from('profiles')
+          .select('*');
 
-            setUsers((prev) => {
-              if (prev.some((u) => u.id === newProfile.id)) return prev;
-              return [newUser, ...prev];
-            });
-          } else if (payload.eventType === 'UPDATE') {
-            const updatedProfile = payload.new;
-            setUsers((prev) =>
-              prev.map((u) =>
-                u.id === updatedProfile.id
-                  ? {
-                      ...u,
-                      is_banned: updatedProfile.is_banned,
-                      is_admin: updatedProfile.is_admin,
-                      full_name: updatedProfile.full_name || u.full_name,
-                      email: updatedProfile.email || u.email,
-                      avatar_url: updatedProfile.avatar_url || u.avatar_url,
-                    }
-                  : u
-              )
-            );
-          } else if (payload.eventType === 'DELETE') {
-            const deletedProfile = payload.old;
-            setUsers((prev) => prev.filter((u) => u.id !== deletedProfile.id));
-          }
+        if (profilesError) throw profilesError;
+
+        if (profiles && profiles.length > 0) {
+          const mapped: AdminUser[] = profiles.map((p) => ({
+            id: p.id,
+            email: p.email || '',
+            full_name: p.full_name,
+            avatar_url: p.avatar_url,
+            is_banned: p.is_banned || false,
+            is_admin: p.is_admin || false,
+            created_at: p.created_at || undefined,
+          }));
+
+          mapped.sort((a, b) => {
+             if (a.created_at && b.created_at) {
+                return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+             }
+             return 0;
+          });
+
+          if (isMounted) setUsers(mapped);
+        } else {
+          if (isMounted) setUsers([]);
         }
-      )
-      .subscribe();
+      } catch (e: any) {
+        console.error('Error fetching admin dashboard users:', e);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
 
-    const controlsSubscription = supabase
-      .channel('system_controls_changes')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'system_controls' },
-        (payload) => {
-          fetchSystemControls();
+    const loadSystemControls = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('system_controls')
+          .select('*')
+          .eq('id', 1)
+          .single();
+        
+        if (error && error.code !== 'PGRST116') {
+          throw error;
         }
-      )
-      .subscribe();
+        
+        if (data && isMounted) {
+          setSystemControls(data);
+        }
+      } catch (e) {
+        console.error('Failed to fetch system controls', e);
+      } finally {
+        if (isMounted) setLoadingControls(false);
+      }
+    };
+
+    loadInitialData();
+    loadSystemControls();
+
+    const profilesChannel = supabase.channel('public:profiles');
+    
+    profilesChannel.on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'profiles' },
+      (payload) => {
+        if (payload.eventType === 'INSERT') {
+          const newProfile = payload.new;
+          const newUser: AdminUser = {
+            id: newProfile.id,
+            full_name: newProfile.full_name || 'New User',
+            email: newProfile.email || '',
+            avatar_url: newProfile.avatar_url,
+            created_at: newProfile.created_at || new Date().toISOString(),
+            is_banned: newProfile.is_banned || false,
+            is_admin: newProfile.is_admin || false,
+          };
+
+          setUsers((prevUsers) => {
+            if (prevUsers.some((u) => u.id === newProfile.id)) return prevUsers;
+            return [newUser, ...prevUsers];
+          });
+        } else if (payload.eventType === 'UPDATE') {
+          const updatedProfile = payload.new;
+          setUsers((prevUsers) =>
+            prevUsers.map((user) =>
+              user.id === updatedProfile.id
+                ? {
+                    ...user,
+                    is_banned: updatedProfile.is_banned,
+                    is_admin: updatedProfile.is_admin,
+                    full_name: updatedProfile.full_name || user.full_name,
+                    email: updatedProfile.email || user.email,
+                    avatar_url: updatedProfile.avatar_url || user.avatar_url,
+                  }
+                : user
+            )
+          );
+        } else if (payload.eventType === 'DELETE') {
+          setUsers((prevUsers) => prevUsers.filter((user) => user.id !== payload.old.id));
+        }
+      }
+    ).subscribe();
+
+    const controlsChannel = supabase.channel('system_controls_changes');
+    
+    controlsChannel.on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'system_controls' },
+      (payload) => {
+        loadSystemControls();
+      }
+    ).subscribe();
 
     return () => {
-      supabase.removeChannel(subscription);
-      supabase.removeChannel(controlsSubscription);
+      isMounted = false;
+      supabase.removeChannel(profilesChannel);
+      supabase.removeChannel(controlsChannel);
     };
   }, []);
 
