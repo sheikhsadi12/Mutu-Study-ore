@@ -10,36 +10,8 @@ export function Home({ toggleTheme, isDarkMode, searchQuery, setSearchQuery }: a
   const [activeNote, setActiveNote] = useState<Note | null>(null);
   const [filter, setFilter] = useState('All');
   const [notes, setNotes] = useState<Note[]>([]);
-  const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem('mutu_recent_searches');
-      if (stored) {
-        setRecentSearches(JSON.parse(stored));
-      }
-    } catch (e) {
-      console.warn('Failed to parse recent searches', e);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!searchQuery?.trim()) return;
-
-    const timeoutId = setTimeout(() => {
-      setRecentSearches(prev => {
-        const query = searchQuery.trim();
-        const filtered = prev.filter(q => q.toLowerCase() !== query.toLowerCase());
-        const updated = [query, ...filtered].slice(0, 5);
-        localStorage.setItem('mutu_recent_searches', JSON.stringify(updated));
-        return updated;
-      });
-    }, 1000);
-
-    return () => clearTimeout(timeoutId);
-  }, [searchQuery]);
 
   useEffect(() => {
     const fetchNotes = async () => {
@@ -137,21 +109,6 @@ export function Home({ toggleTheme, isDarkMode, searchQuery, setSearchQuery }: a
               ))}
             </div>
           </div>
-
-          {recentSearches.length > 0 && !searchQuery && (
-            <div className="mb-6 flex flex-wrap items-center gap-2">
-              <span className="text-[10px] md:text-xs font-bold text-theme-text/50 uppercase tracking-widest mr-2">Recent Searches:</span>
-              {recentSearches.map(term => (
-                <button
-                  key={term}
-                  onClick={() => setSearchQuery(term)}
-                  className="px-2.5 py-1 text-[10px] md:text-xs rounded-full bg-theme-muted/50 border border-theme-border/50 text-theme-text/70 hover:bg-theme-muted hover:text-theme-accent-end transition-colors"
-                >
-                  {term}
-                </button>
-              ))}
-            </div>
-          )}
 
           {isLoading && notes.length === 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-6">

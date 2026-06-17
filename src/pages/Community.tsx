@@ -8,7 +8,7 @@ import { cn } from '../lib/utils';
 import { TextFormatter } from '../components/TextFormatter';
 
 const isArabic = (text: string) => /[\u0600-\u06FF]/.test(text || '');
-const getTextClass = (text: string) => isArabic(text) ? 'font-arabic text-[16px] leading-relaxed text-right dir-rtl' : 'font-sans text-[15px]';
+const getTextClass = (text: string) => isArabic(text) ? 'font-arabic text-[15px] leading-relaxed text-right dir-rtl' : 'font-sans text-[15px]';
 
 interface ProfileData {
   id: string;
@@ -72,7 +72,7 @@ const ChatBubble = React.memo(({ msg, isMe, showHeader, isAdmin, onDelete, onBan
           className={cn(
             "w-fit max-w-[80%] px-3 py-1.5 whitespace-pre-wrap break-words relative transform-gpu will-change-transform text-[15px]",
             isMsgAdmin 
-              ? "bg-gradient-to-r from-[#2a020b] to-[#4C0519] text-[#e8c3a2] rounded-[18px] shadow-sm border border-[#4C0519]/50" 
+              ? "bg-theme-muted text-theme-text rounded-[18px] shadow-sm border border-theme-accent-start/40 font-medium" 
               : isMe 
                 ? "bg-theme-accent-start text-white shadow-sm" 
                 : "bg-theme-card border border-theme-border/70 text-theme-text shadow-sm",
@@ -746,7 +746,7 @@ export function MessageMenu({ isMe, isAdmin, copied, onReply, onCopy, onDelete, 
   return (
     <DropdownMenu.Root modal={false}>
       <DropdownMenu.Trigger asChild>
-        <button onClick={(e) => e.stopPropagation()} className="p-1 mb-1 text-theme-text/40 hover:text-theme-text/80 rounded-full outline-none focus:ring-2 focus:ring-theme-accent-start/50 transition-colors shrink-0">
+        <button className="p-1 mb-1 text-theme-text/40 hover:text-theme-text/80 rounded-full outline-none focus:ring-2 focus:ring-theme-accent-start/50 transition-colors shrink-0">
           <MoreVertical className="w-3.5 h-3.5" />
         </button>
       </DropdownMenu.Trigger>

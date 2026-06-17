@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { User, CheckCircle2, Settings, LogOut, Search, Moon, Sun, MonitorSmartphone, ArrowLeft, FileText, Printer, Key, MessageCircle } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { User, CheckCircle2, Settings, LogOut, Search, Moon, Sun, MonitorSmartphone, ArrowLeft, FileText, Printer, Key, MessageCircle, Clock, X } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Note } from '../types';
 import { supabase } from '../supabaseClient';
@@ -19,9 +19,11 @@ interface HeaderProps {
 export function Header({ toggleTheme, isDarkMode, searchQuery, setSearchQuery, activeNote, onBack }: HeaderProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [user, setUser] = useState<AuthUser | null>(null);
   const [geminiKey, setGeminiKey] = useState('');
   const navigate = useNavigate();
+  const searchContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     // Get current session
@@ -33,6 +35,41 @@ export function Header({ toggleTheme, isDarkMode, searchQuery, setSearchQuery, a
     if (savedKey) {
       setGeminiKey(savedKey);
     }
+
+    try {
+      const stored = localStorage.getItem('mutu_recent_searches');
+      if (stored) {
+        setRecentSearches(JSON.parse(stored));
+      }
+    } catch (e) {
+      console.warn('Failed to parse recent searches', e);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!searchQuery?.trim()) return;
+
+    const timeoutId = setTimeout(() => {
+      setRecentSearches(prev => {
+        const query = searchQuery.trim();
+        const filtered = prev.filter(q => q.toLowerCase() !== query.toLowerCase());
+        const updated = [query, ...filtered].slice(0, 5);
+        localStorage.setItem('mutu_recent_searches', JSON.stringify(updated));
+        return updated;
+      });
+    }, 1000);
+
+    return () => clearTimeout(timeoutId);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(event.target as Node)) {
+        setSearchOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   const handleSaveGeminiKey = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -75,17 +112,16 @@ export function Header({ toggleTheme, isDarkMode, searchQuery, setSearchQuery, a
 
       <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
         {!activeNote && (
-          <div className="relative flex items-center">
-            <Search className={cn("w-4 h-4 absolute left-3 pointer-events-none transition-colors", (searchQuery || searchOpen) ? "text-theme-accent-end" : "text-theme-text/60")} />
+          <div className="relative flex items-center" ref={searchContainerRef}>
+            <Search className={cn("w-4 h-4 absolute left-3 z-[11] pointer-events-none transition-colors", (searchQuery || searchOpen) ? "text-theme-accent-end" : "text-theme-text/60")} />
             <input 
               type="text" 
               placeholder="Search..." 
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onFocus={() => setSearchOpen(true)}
-              onBlur={() => setSearchOpen(false)}
               className={cn(
-                "py-1.5 pl-9 pr-4 rounded-full text-xs outline-none transition-all duration-300",
+                "py-1.5 pl-9 pr-4 rounded-full text-xs outline-none transition-all duration-300 relative z-10",
                 "bg-theme-muted/30 border border-theme-border/50 text-theme-text",
                 (searchQuery || searchOpen) 
                   ? "w-48 sm:w-64 max-w-[50vw] bg-theme-bg border-theme-accent-end placeholder:text-theme-text/40 ring-1 ring-theme-accent-end/30" 
@@ -93,6 +129,32 @@ export function Header({ toggleTheme, isDarkMode, searchQuery, setSearchQuery, a
                 "focus:w-48 sm:focus:w-64 focus:max-w-xs focus:bg-theme-bg focus:border-theme-accent-end focus:ring-1 focus:ring-theme-accent-end/50 focus:text-theme-text focus:placeholder:text-theme-text/40 focus:cursor-text"
               )}
             />
+            {searchOpen && !searchQuery && recentSearches.length > 0 && (
+              <div className="absolute top-full mt-2 w-full bg-theme-bg border border-theme-border/50 rounded-xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.15)] overflow-hidden z-[100] animate-in fade-in slide-in-from-top-1 py-1 min-w-[200px] left-0">
+                <div className="px-3 py-1.5 text-[10px] font-bold text-theme-text/50 uppercase tracking-widest flex items-center justify-between">
+                  <span>Recent Searches</span>
+                </div>
+                {recentSearches.map((term, i) => (
+                  <div key={i} className="flex items-center justify-between px-1 hover:bg-theme-muted/50 transition-colors group cursor-pointer" onClick={() => { setSearchQuery(term); setSearchOpen(false); }}>
+                    <div className="flex items-center gap-2 flex-1 px-2 py-1.5 min-w-0">
+                      <Clock className="w-3 h-3 text-theme-text/40 shrink-0" />
+                      <span className="text-xs text-theme-text/80 truncate group-hover:text-theme-accent-end transition-colors">{term}</span>
+                    </div>
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const updated = recentSearches.filter(t => t !== term);
+                        setRecentSearches(updated);
+                        localStorage.setItem('mutu_recent_searches', JSON.stringify(updated));
+                      }}
+                      className="p-1.5 text-theme-text/40 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all rounded-md shrink-0"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

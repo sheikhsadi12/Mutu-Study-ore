@@ -6,7 +6,7 @@ import { cn } from "../lib/utils";
 import { TextFormatter } from "./TextFormatter";
 
 const isArabic = (text: string) => /[\u0600-\u06FF]/.test(text || '');
-const getTextClass = (text: string) => isArabic(text) ? 'font-arabic text-[16px] leading-relaxed text-right dir-rtl' : 'font-sans text-[15px]';
+const getTextClass = (text: string) => isArabic(text) ? 'font-arabic text-[15px] leading-relaxed text-right dir-rtl' : 'font-sans text-[15px]';
 
 interface ProfileData {
   id: string;
@@ -503,7 +503,7 @@ const CommentItem = React.memo(({ comment, isMe, isAdmin, showHeader, repliedMsg
           className={cn(
             "w-fit max-w-[85%] px-3 py-1.5 whitespace-pre-wrap break-words relative transform-gpu will-change-transform leading-relaxed shadow-sm text-[15px]",
             isMsgAdmin  
-              ? "bg-gradient-to-r from-[#2a020b] to-[#4C0519] text-[#e8c3a2] border border-[#4C0519]/50" 
+              ? "bg-theme-muted border border-theme-accent-start/40 text-theme-text shadow-sm" 
               : isMe 
                 ? "bg-theme-accent-start text-white" 
                 : "bg-theme-card border border-theme-border/70 text-theme-text",
@@ -546,7 +546,7 @@ function MessageMenu({ isMe, isAdmin, copied, onReply, onCopy, onDelete, onViewP
   return (
     <DropdownMenu.Root modal={false}>
       <DropdownMenu.Trigger asChild>
-        <button onClick={(e) => e.stopPropagation()} className="p-1 mb-1 text-theme-text/40 hover:text-theme-text/80 rounded-full outline-none focus:ring-2 focus:ring-theme-accent-start/50 transition-colors">
+        <button className="p-1 mb-1 text-theme-text/40 hover:text-theme-text/80 rounded-full outline-none focus:ring-2 focus:ring-theme-accent-start/50 transition-colors">
           <MoreVertical className="w-3.5 h-3.5" />
         </button>
       </DropdownMenu.Trigger>
