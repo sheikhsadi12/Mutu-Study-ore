@@ -14,6 +14,7 @@ interface ProfileData {
   avatar_url: string;
   is_banned?: boolean;
   suspended_until?: string | null;
+  is_admin?: boolean;
 }
 
 interface NoteComment {
@@ -45,7 +46,8 @@ export function Comments({ noteId }: { noteId: string }) {
   const controlsSubscriptionRef = useRef<any>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const isAdmin = user?.email === 'sadishekh671@gmail.com';
+  const isSuperAdmin = user?.email === 'sadishekh671@gmail.com';
+  const isAdmin = isSuperAdmin || profile?.is_admin === true;
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -103,7 +105,7 @@ export function Comments({ noteId }: { noteId: string }) {
   };
 
   useEffect(() => {
-    if (user?.email === 'sadishekh671@gmail.com' && selectedAdminProfile) {
+    if (isAdmin && selectedAdminProfile) {
        supabase.from('profiles').select('is_banned, suspended_until').eq('id', selectedAdminProfile.user_id).single()
          .then(({data}) => {
             if (data) setAdminUserStatus(data);
@@ -111,7 +113,7 @@ export function Comments({ noteId }: { noteId: string }) {
     } else {
        setAdminUserStatus(null);
     }
-  }, [selectedAdminProfile, user?.email]);
+  }, [selectedAdminProfile, isAdmin]);
 
   const fetchData = async () => {
     // Fetch Comments
@@ -216,8 +218,7 @@ export function Comments({ noteId }: { noteId: string }) {
       textareaRef.current.style.height = 'auto';
     }
 
-    const isAdminUser = user.email === 'sadishekh671@gmail.com';
-    const finalAvatarUrl = isAdminUser ? `${profile.avatar_url}#admin` : profile.avatar_url;
+    const finalAvatarUrl = isAdmin ? `${profile.avatar_url}#admin` : profile.avatar_url;
 
     const payload: any = {
        note_id: noteId,

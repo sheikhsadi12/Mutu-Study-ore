@@ -12,19 +12,33 @@ interface PrivateRouteProps {
 
 export function PrivateRoute({ children, adminOnly = false }: PrivateRouteProps) {
   const [user, setUser] = useState<User | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const location = useLocation();
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      const currentUser = session?.user ?? null;
+      setUser(currentUser);
+
+      if (currentUser) {
+        if (currentUser.email === ADMIN_EMAIL) {
+          setIsAdmin(true);
+        } else {
+          // Check profile for is_admin
+          const { data } = await supabase.from('profiles').select('is_admin').eq('id', currentUser.id).single();
+          setIsAdmin(data?.is_admin === true);
+        }
+      }
       setLoading(false);
-    });
+    };
+    checkAuth();
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
+      checkAuth();
     });
 
     return () => subscription.unsubscribe();
@@ -38,7 +52,7 @@ export function PrivateRoute({ children, adminOnly = false }: PrivateRouteProps)
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  if (adminOnly && user.email !== ADMIN_EMAIL) {
+  if (adminOnly && !isAdmin) {
     return <Navigate to="/" replace />;
   }
 

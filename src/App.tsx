@@ -17,6 +17,8 @@ import { Community } from './pages/Community';
 import { AiChat } from './pages/AiChat';
 import { AdminDashboard } from './pages/AdminDashboard';
 
+import { PWAManager } from './components/PWAManager';
+
 function GlobalFABs() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -117,6 +119,7 @@ export default function App() {
 
   return (
     <BrowserRouter>
+      <PWAManager />
       <GlobalFABs />
       <Routes>
         <Route path="/login" element={<Login />} />

@@ -16,6 +16,7 @@ interface ProfileData {
   avatar_url: string;
   is_banned?: boolean;
   suspended_until?: string | null;
+  is_admin?: boolean;
 }
 
 interface Message {
@@ -196,8 +197,14 @@ export function Community() {
   const [adminUserStatus, setAdminUserStatus] = useState<{is_banned: boolean, suspended_until: string | null} | null>(null);
   const [isChatDisabled, setIsChatDisabled] = useState(false);
 
+  const subscriptionRef = useRef<any>(null);
+  const controlsSubscriptionRef = useRef<any>(null);
+
+  const isSuperAdmin = user?.email === 'sadishekh671@gmail.com';
+  const isAdmin = isSuperAdmin || profile?.is_admin === true;
+
   useEffect(() => {
-    if (user?.email === 'sadishekh671@gmail.com' && selectedAdminProfile) {
+    if (isAdmin && selectedAdminProfile) {
        supabase.from('profiles').select('is_banned, suspended_until').eq('id', selectedAdminProfile.user_id).single()
          .then(({data}) => {
             if (data) setAdminUserStatus(data);
@@ -205,12 +212,7 @@ export function Community() {
     } else {
        setAdminUserStatus(null);
     }
-  }, [selectedAdminProfile, user?.email]);
-
-  const subscriptionRef = useRef<any>(null);
-  const controlsSubscriptionRef = useRef<any>(null);
-
-  const isAdmin = user?.email === 'sadishekh671@gmail.com';
+  }, [selectedAdminProfile, isAdmin]);
 
   const fetchSystemControls = async () => {
     try {
@@ -451,8 +453,7 @@ export function Community() {
     if (!msgText.trim() || !user || !profile) return;
 
     try {
-      const isAdminUser = user.email === 'sadishekh671@gmail.com';
-      const finalAvatarUrl = isAdminUser ? `${profile.avatar_url}#admin` : profile.avatar_url;
+      const finalAvatarUrl = isAdmin ? `${profile.avatar_url}#admin` : profile.avatar_url;
 
       const payload: any = {
         user_id: user.id,

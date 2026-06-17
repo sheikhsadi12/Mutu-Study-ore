@@ -8,7 +8,8 @@ interface AdminUser {
   email: string;
   username: string;
   created_at?: string;
-  is_banned?: boolean; // From profiles join or manual merge
+  is_banned?: boolean;
+  is_admin?: boolean;
 }
 
 interface SystemControls {
@@ -30,8 +31,12 @@ export function AdminDashboard() {
     is_comments_disabled: false,
   });
   const [loadingControls, setLoadingControls] = useState(true);
+  const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null);
 
   useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setCurrentUserEmail(session?.user?.email || null);
+    });
     fetchUsers();
     fetchSystemControls();
 
@@ -124,7 +129,7 @@ export function AdminDashboard() {
         // Fetch profiles
         const { data: profiles, error: profilesError } = await supabase
           .from('profiles')
-          .select('id, is_banned')
+          .select('id, is_banned, is_admin')
           .in('id', ids);
 
         if (profilesError) throw profilesError;
@@ -135,6 +140,7 @@ export function AdminDashboard() {
           return {
             ...adminUser,
             is_banned: profile?.is_banned || false,
+            is_admin: profile?.is_admin || adminUser.is_admin || false,
           };
         });
 
@@ -155,6 +161,38 @@ export function AdminDashboard() {
       alert('Failed to load user list.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleToggleAdmin = async (userId: string, currentlyAdmin: boolean) => {
+    if (!window.confirm(`Are you sure you want to ${currentlyAdmin ? 'remove' : 'make'} this user an admin?`)) return;
+
+    try {
+      const { error: adminError } = await supabase
+        .from('admin_user_list')
+        .update({ is_admin: !currentlyAdmin })
+        .eq('id', userId);
+
+      if (adminError) throw adminError;
+
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({ is_admin: !currentlyAdmin })
+        .eq('id', userId);
+
+      if (profileError) throw profileError;
+
+      setUsers((prev) =>
+        prev.map((u) => {
+          if (u.id === userId) {
+            return { ...u, is_admin: !currentlyAdmin };
+          }
+          return u;
+        })
+      );
+    } catch (e: any) {
+      console.error('Error toggling admin status:', e);
+      alert('Failed to update admin status.');
     }
   };
 
@@ -216,6 +254,7 @@ export function AdminDashboard() {
       <main className="p-6 max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
         
         {/* System Maintence Controls */}
+        {currentUserEmail === 'sadishekh671@gmail.com' && (
         <div className="bg-theme-card border border-theme-border p-6 rounded-[24px] shadow-sm">
           <div className="flex items-center gap-3 mb-6 border-b border-theme-border/50 pb-4">
             <Settings className="w-6 h-6 text-theme-accent-end" />
@@ -276,6 +315,7 @@ export function AdminDashboard() {
             </div>
           )}
         </div>
+        )}
 
         <div className="flex flex-col md:flex-row items-center gap-6 justify-between bg-theme-card border border-theme-border p-6 rounded-[24px] shadow-sm">
            <div className="flex items-center gap-4 text-theme-text">
@@ -309,13 +349,16 @@ export function AdminDashboard() {
                   <th className="p-4 text-xs font-bold text-theme-text/50 uppercase tracking-wider">Community Nickname</th>
                   <th className="p-4 text-xs font-bold text-theme-text/50 uppercase tracking-wider">Join Date</th>
                   <th className="p-4 text-xs font-bold text-theme-text/50 uppercase tracking-wider">Status</th>
+                  {currentUserEmail === 'sadishekh671@gmail.com' && (
+                     <th className="p-4 text-xs font-bold text-theme-text/50 uppercase tracking-wider">Admin Status</th>
+                  )}
                   <th className="p-4 text-xs font-bold text-theme-text/50 uppercase tracking-wider text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                    <tr>
-                      <td colSpan={5} className="p-8 text-center text-theme-text/50">
+                      <td colSpan={currentUserEmail === 'sadishekh671@gmail.com' ? 6 : 5} className="p-8 text-center text-theme-text/50">
                          <div className="flex items-center justify-center gap-3">
                             <div className="w-5 h-5 border-2 border-theme-accent-start border-t-transparent rounded-full animate-spin"></div>
                             Loading intel...
@@ -324,7 +367,7 @@ export function AdminDashboard() {
                    </tr>
                 ) : filteredUsers.length === 0 ? (
                    <tr>
-                      <td colSpan={5} className="p-8 text-center text-theme-text/50">
+                      <td colSpan={currentUserEmail === 'sadishekh671@gmail.com' ? 6 : 5} className="p-8 text-center text-theme-text/50">
                         No users found in the database.
                       </td>
                    </tr>
@@ -352,6 +395,21 @@ export function AdminDashboard() {
                            </span>
                         )}
                       </td>
+                      {currentUserEmail === 'sadishekh671@gmail.com' && (
+                        <td className="p-4">
+                          <button
+                            onClick={() => handleToggleAdmin(user.id, user.is_admin || false)}
+                            disabled={user.email === 'sadishekh671@gmail.com'}
+                            className={`inline-flex items-center justify-center min-w-[120px] px-3 py-1.5 rounded-lg text-xs font-bold border shadow-sm transition-all ${
+                              user.is_admin 
+                              ? 'bg-theme-muted text-theme-text hover:bg-theme-border border-theme-border/50 disabled:opacity-50' 
+                              : 'bg-blue-500/10 text-blue-500 border-blue-500/20 hover:bg-blue-500/20 disabled:opacity-50'
+                            }`}
+                          >
+                            {user.is_admin ? '❌ Remove Admin' : '👑 Make Admin'}
+                          </button>
+                        </td>
+                      )}
                       <td className="p-4 text-right">
                         <button
                           onClick={() => handleBanUser(user.id, user.is_banned || false)}
