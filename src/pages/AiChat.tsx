@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Sparkles, X, Send, Bot, Loader2, Plus, FileText, CheckCircle2, Menu, ArrowLeft, PlusCircle, MessageSquare, Copy, CopyCheck } from 'lucide-react';
+import { Sparkles, X, Send, Bot, Loader2, Plus, FileText, CheckCircle2, Menu, ArrowLeft, PlusCircle, MessageSquare, Copy, CopyCheck, Settings } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { Note } from '../types';
@@ -81,9 +81,8 @@ export function AiChat({ toggleTheme, isDarkMode }: any) {
   // Gemini State
   const [aiQuery, setAiQuery] = useState('');
   const [isAiLoading, setIsAiLoading] = useState(false);
-  const systemKey = import.meta.env.VITE_GEMINI_API_KEY;
-  const [localApiKey, setLocalApiKey] = useState(() => localStorage.getItem('mutu_user_gemini_key') || '');
-  const [showSetupGuide, setShowSetupGuide] = useState(!systemKey && !localApiKey);
+  const [localApiKey, setLocalApiKey] = useState(() => localStorage.getItem('user_gemini_api_key') || '');
+  const [showSetupGuide, setShowSetupGuide] = useState(!localApiKey);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -111,8 +110,14 @@ export function AiChat({ toggleTheme, isDarkMode }: any) {
   const saveApiKey = (key: string) => {
     if (!key.trim()) return;
     setLocalApiKey(key);
-    localStorage.setItem('mutu_user_gemini_key', key);
+    localStorage.setItem('user_gemini_api_key', key);
     setShowSetupGuide(false);
+  };
+
+  const resetApiKey = () => {
+    setLocalApiKey('');
+    localStorage.removeItem('user_gemini_api_key');
+    setShowSetupGuide(true);
   };
 
   const toggleAttachment = (noteId: string) => {
@@ -138,8 +143,8 @@ export function AiChat({ toggleTheme, isDarkMode }: any) {
   const handleAiSubmit = async () => {
     if (!aiQuery.trim() || isAiLoading) return;
 
-    const apiKey = systemKey || localApiKey;
-    if (!apiKey) {
+    const userKey = localStorage.getItem('user_gemini_api_key');
+    if (!userKey) {
       setShowSetupGuide(true);
       return;
     }
@@ -188,6 +193,12 @@ export function AiChat({ toggleTheme, isDarkMode }: any) {
 
       const systemInstruction = `You are an expert AI tutor. Use the provided context to answer the user's question perfectly in Bengali. DO NOT mention HTML.`;
 
+      const genAI = new GoogleGenerativeAI(userKey);
+      const model = genAI.getGenerativeModel({ 
+        model: "gemini-2.5-flash",
+        systemInstruction
+      });
+
       const historyToPass = currentMsgs.filter(m => m.content !== '').map(m => ({
         role: m.role,
         parts: [{ text: m.content }]
@@ -197,62 +208,26 @@ export function AiChat({ toggleTheme, isDarkMode }: any) {
         ? `Context Document:\n${contextText}\n\nUser Question:\n${currentQuery}`
         : currentQuery;
 
-      historyToPass.push({ role: 'user', parts: [{ text: actualPromptToSend }]});
-
-      const response = await fetch('/api/gemini', {
-         method: 'POST',
-         headers: { 'Content-Type': 'application/json' },
-         body: JSON.stringify({
-           apiKey: apiKey,
-           systemInstruction,
-           contents: historyToPass
-         })
+      const chat = model.startChat({
+        history: historyToPass
       });
 
-      if (!response.ok) {
-         console.error(await response.text());
-         throw new Error(`AI Error: ${response.statusText}`);
-      }
+      const result = await chat.sendMessageStream([{text: actualPromptToSend}]);
 
-      const reader = response.body?.getReader();
-      if (!reader) throw new Error("No response stream");
-      const decoder = new TextDecoder();
       let isFirstChunk = true;
-      let buffer = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
+      for await (const chunk of result.stream) {
+        if (isFirstChunk) { setIsAiLoading(false); isFirstChunk = false; }
+        const chunkText = chunk.text();
         
-        const chunks = buffer.split('\n\n');
-        buffer = chunks.pop() || "";
-        
-        for (const chunk of chunks) {
-          if (chunk.startsWith('data: ')) {
-            const dataStr = chunk.slice(6);
-            if (dataStr === '[DONE]') continue;
-            try {
-              const data = JSON.parse(dataStr);
-              if (data.text) {
-                if (isFirstChunk) { setIsAiLoading(false); isFirstChunk = false; }
-                const chunkText = data.text;
-                
-                setSessions(prev => prev.map(s => {
-                  if (s.id === activeId) {
-                     const newMsgs = [...s.messages];
-                     const lastMsg = newMsgs[newMsgs.length - 1];
-                     newMsgs[newMsgs.length - 1] = { ...lastMsg, content: lastMsg.content + chunkText };
-                     return { ...s, messages: newMsgs, updatedAt: Date.now() };
-                  }
-                  return s;
-                }));
-              }
-            } catch (err) {
-               console.error("Parse error on stream chunk:", err);
-            }
+        setSessions(prev => prev.map(s => {
+          if (s.id === activeId) {
+             const newMsgs = [...s.messages];
+             const lastMsg = newMsgs[newMsgs.length - 1];
+             newMsgs[newMsgs.length - 1] = { ...lastMsg, content: lastMsg.content + chunkText };
+             return { ...s, messages: newMsgs, updatedAt: Date.now() };
           }
-        }
+          return s;
+        }));
       }
     } catch (e: any) {
       console.error(e);
@@ -290,9 +265,16 @@ export function AiChat({ toggleTheme, isDarkMode }: any) {
             </h1>
           </div>
         </div>
-        <button onClick={() => navigate(-1)} className="p-2 rounded-full hover:bg-theme-muted transition-colors text-theme-text/80">
-          <ArrowLeft className="w-5 h-5" />
-        </button>
+        <div className="flex items-center gap-2">
+          {!showSetupGuide && (
+            <button onClick={resetApiKey} className="p-2 rounded-full hover:bg-theme-muted transition-colors text-theme-text/80" title="Change API Key">
+              <Settings className="w-5 h-5" />
+            </button>
+          )}
+          <button onClick={() => navigate(-1)} className="p-2 rounded-full hover:bg-theme-muted transition-colors text-theme-text/80">
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+        </div>
       </header>
 
       {isSidebarOpen && (
@@ -349,15 +331,16 @@ export function AiChat({ toggleTheme, isDarkMode }: any) {
                  <h3 className="font-heading font-black text-[22px] tracking-tight text-theme-text">Connect Your AI</h3>
                </div>
                <div className="space-y-4 mb-8 text-[15px] leading-relaxed text-theme-text/80">
-                 <p><span className="font-bold text-theme-accent-start">Step 1:</span> Get your API Key from Google AI Studio.</p>
+                 <p><span className="font-bold text-theme-accent-start">১.</span> Google AI Studio-তে যান।</p>
                  <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="mt-3 flex items-center justify-center gap-2 bg-theme-muted border border-theme-border text-theme-text font-bold py-2.5 px-4 rounded-xl transition-all">
                    <Sparkles className="w-4 h-4 text-theme-accent-end" /> Google AI Studio
                  </a>
-                 <p><span className="font-bold text-theme-accent-start">Step 2:</span> Paste it below.</p>
+                 <p><span className="font-bold text-theme-accent-start">২.</span> আপনার গুগল অ্যাকাউন্ট দিয়ে লগইন করে 'Create API Key' তে ক্লিক করুন।</p>
+                 <p><span className="font-bold text-theme-accent-start">৩.</span> কী-টি কপি করে নিচের বক্সে পেস্ট করে সেভ করুন।</p>
                </div>
                <div className="space-y-4">
                  <input type="password" placeholder="Paste your API Key here..." value={localApiKey} onChange={(e) => setLocalApiKey(e.target.value)} className="w-full bg-theme-bg border border-theme-border/80 rounded-xl px-4 py-3.5 outline-none focus:border-theme-accent-end transition-all shadow-inner text-[15px]" />
-                 <button onClick={() => saveApiKey(localApiKey)} className="w-full bg-gradient-to-r from-theme-accent-start to-theme-accent-end text-white font-bold py-3.5 px-4 rounded-xl shadow-md transition-all flex items-center justify-center gap-2 text-[15px]"><CheckCircle2 className="w-5 h-5" /> Save API Key</button>
+                 <button onClick={() => saveApiKey(localApiKey)} className="w-full bg-gradient-to-r from-theme-accent-start to-theme-accent-end text-white font-bold py-3.5 px-4 rounded-xl shadow-md transition-all flex items-center justify-center gap-2 text-[15px]"><CheckCircle2 className="w-5 h-5" /> Save Key</button>
                </div>
             </div>
           </div>
