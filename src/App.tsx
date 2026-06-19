@@ -5,6 +5,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { OfflineNotification } from './components/OfflineNotification';
+import { motion, AnimatePresence } from 'motion/react';
 import { Home } from './pages/Home';
 import { Admin } from './pages/Admin';
 import { Login } from './pages/Login';
@@ -55,6 +57,94 @@ function GlobalFABs({ hasUnread, setHasUnread }: { hasUnread: boolean; setHasUnr
       >
         <Bot className="w-6 h-6" />
       </button>
+    </div>
+  );
+}
+
+function PageTransition({ children }: { children: React.ReactNode }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 15 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -15 }}
+      transition={{ duration: 0.3, ease: 'easeInOut' }}
+      className="w-full h-full absolute inset-0"
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+function AnimatedRoutes({ toggleTheme, isDarkMode, searchQuery, setSearchQuery, themeMode, setThemeMode }: any) {
+  const location = useLocation();
+
+  return (
+    <div className="relative w-full h-screen overflow-hidden">
+      <AnimatePresence mode="wait" initial={false}>
+        <Routes location={location} key={location.pathname}>
+          <Route path="/login" element={<PageTransition><Login /></PageTransition>} />
+          <Route 
+            path="/" 
+            element={
+              <PrivateRoute>
+                <PageTransition>
+                  <Home 
+                    toggleTheme={toggleTheme} 
+                    isDarkMode={isDarkMode}
+                    searchQuery={searchQuery}
+                    setSearchQuery={setSearchQuery}
+                  />
+                </PageTransition>
+              </PrivateRoute>
+            } 
+          />
+          <Route 
+            path="/ai-chat" 
+            element={
+              <PrivateRoute>
+                <PageTransition>
+                  <AiChat 
+                    toggleTheme={toggleTheme} 
+                    isDarkMode={isDarkMode}
+                  />
+                </PageTransition>
+              </PrivateRoute>
+            } 
+          />
+          <Route 
+            path="/admin" 
+            element={
+              <PrivateRoute adminOnly={true}>
+                <PageTransition><Admin /></PageTransition>
+              </PrivateRoute>
+            } 
+          />
+          <Route 
+            path="/admin-dashboard" 
+            element={
+              <PrivateRoute adminOnly={true}>
+                <PageTransition><AdminDashboard /></PageTransition>
+              </PrivateRoute>
+            } 
+          />
+          <Route 
+            path="/profile" 
+            element={
+              <PrivateRoute>
+                <PageTransition><Profile themeMode={themeMode} setThemeMode={setThemeMode} /></PageTransition>
+              </PrivateRoute>
+            } 
+          />
+          <Route 
+            path="/community" 
+            element={
+              <PrivateRoute>
+                <PageTransition><Community /></PageTransition>
+              </PrivateRoute>
+            } 
+          />
+        </Routes>
+      </AnimatePresence>
     </div>
   );
 }
@@ -161,70 +251,20 @@ export default function App() {
 
   return (
     <>
+      <OfflineNotification />
       {showSplash && <SplashScreen onFinish={() => setShowSplash(false)} />}
       <BrowserRouter>
         <AndroidBackButtonInterceptor />
         <PWAManager />
         <GlobalFABs hasUnread={hasUnread} setHasUnread={setHasUnread} />
-        <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route 
-          path="/" 
-          element={
-            <PrivateRoute>
-              <Home 
-                toggleTheme={toggleTheme} 
-                isDarkMode={isDarkMode}
-                searchQuery={searchQuery}
-                setSearchQuery={setSearchQuery}
-              />
-            </PrivateRoute>
-          } 
+        <AnimatedRoutes 
+          toggleTheme={toggleTheme} 
+          isDarkMode={isDarkMode}
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          themeMode={themeMode}
+          setThemeMode={setThemeMode}
         />
-        <Route 
-          path="/ai-chat" 
-          element={
-            <PrivateRoute>
-              <AiChat 
-                toggleTheme={toggleTheme} 
-                isDarkMode={isDarkMode}
-              />
-            </PrivateRoute>
-          } 
-        />
-        <Route 
-          path="/admin" 
-          element={
-            <PrivateRoute adminOnly={true}>
-              <Admin />
-            </PrivateRoute>
-          } 
-        />
-        <Route 
-          path="/admin-dashboard" 
-          element={
-            <PrivateRoute adminOnly={true}>
-              <AdminDashboard />
-            </PrivateRoute>
-          } 
-        />
-        <Route 
-          path="/profile" 
-          element={
-            <PrivateRoute>
-              <Profile themeMode={themeMode} setThemeMode={setThemeMode} />
-            </PrivateRoute>
-          } 
-        />
-        <Route 
-          path="/community" 
-          element={
-            <PrivateRoute>
-              <Community />
-            </PrivateRoute>
-          } 
-        />
-      </Routes>
       </BrowserRouter>
     </>
   );

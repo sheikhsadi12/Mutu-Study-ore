@@ -31,6 +31,19 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
+  // Ignore non-HTTP(S) protocols (like ws://, chrome-extension://)
+  if (!event.request.url.startsWith('http')) return;
+
+  // Ignore Vite HMR & Dev paths
+  if (
+    event.request.url.includes('/@vite/') ||
+    event.request.url.includes('/@react-refresh') ||
+    event.request.url.includes('node_modules') ||
+    event.request.url.includes('?import')
+  ) {
+    return;
+  }
+
   // Network-first strategy for a dynamic React app
   // This ensures the app can still work offline while aggressively fetching the latest if online
   if (event.request.method !== 'GET') return;

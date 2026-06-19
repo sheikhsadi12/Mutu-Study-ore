@@ -312,11 +312,20 @@ export function Community() {
       setMessages(prev => prev.map(m => m.id === messageId ? { ...m, reactions: newReactions } : m));
 
       // DB update
-      const { error } = await supabase.from('community_messages').update({ reactions: newReactions }).eq('id', messageId);
-      if (error) {
+      const { data, error } = await supabase.from('community_messages').update({ reactions: newReactions }).eq('id', messageId).select();
+      if (error || !data || data.length === 0) {
+         console.error("Update failed or no row updated (possible RLS restriction)");
          fetchMessages(); // Revert on error
-         throw error;
+         // Note: If no rows updated, it silently fails unless we throw
+         return;
       }
+      
+      // Broadcast reaction to other users to bypass potential postgres_changes replication config issues
+      supabase.channel('community_messages_broadcast').send({
+        type: 'broadcast',
+        event: 'reaction',
+        payload: { messageId, reactions: newReactions }
+      });
     } catch (e) {
       console.error('Error reacting to message', e);
     }
@@ -472,7 +481,10 @@ export function Community() {
     if (subscriptionRef.current) return;
 
     const channel = supabase
-      .channel(`community_messages_${Date.now()}`)
+      .channel('community_messages_broadcast')
+      .on('broadcast', { event: 'reaction' }, (payload) => {
+        setMessages(prev => prev.map(m => m.id === payload.payload.messageId ? { ...m, reactions: payload.payload.reactions } : m));
+      })
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'community_messages' },
@@ -495,7 +507,7 @@ export function Community() {
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'community_messages' },
         (payload) => {
-          setMessages(prev => prev.map(m => m.id === payload.new.id ? payload.new as Message : m));
+          setMessages(prev => prev.map(m => m.id === payload.new.id ? { ...m, ...payload.new } : m));
         }
       )
       .on(
