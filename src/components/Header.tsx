@@ -6,6 +6,7 @@ import { supabase } from '../supabaseClient';
 import { useNavigate } from 'react-router-dom';
 import { ADMIN_EMAIL } from './PrivateRoute';
 import { User as AuthUser } from '@supabase/supabase-js';
+import { AppIcon } from './AppIcon';
 
 interface HeaderProps {
   toggleTheme: () => void;
@@ -94,7 +95,7 @@ export function Header({ toggleTheme, isDarkMode, searchQuery, setSearchQuery, a
         
         {!searchOpen && (
           <div className="flex items-center gap-2 min-w-0">
-            {!activeNote && <div className="w-6 h-6 bg-gradient-to-br from-theme-accent-start to-theme-accent-end rounded-[6px] flex items-center justify-center text-white font-bold text-xs shrink-0 hidden sm:flex">M</div>}
+            {!activeNote && <AppIcon size={24} className="hidden sm:flex shrink-0" />}
             <h1 className="text-sm md:text-lg tracking-tight font-heading font-black text-theme-accent-start truncate shrink-0 cursor-pointer" onClick={() => navigate('/')}>
               MUTU STUDY
             </h1>

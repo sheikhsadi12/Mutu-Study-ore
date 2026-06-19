@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { AppIcon } from './AppIcon';
 
 export function SplashScreen({ onFinish }: { onFinish: () => void }) {
   const [isVisible, setIsVisible] = useState(true);
@@ -29,20 +30,9 @@ export function SplashScreen({ onFinish }: { onFinish: () => void }) {
               initial={{ scale: 0.8, opacity: 0, y: 10 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               transition={{ duration: 1, ease: "easeOut", type: "spring", bounce: 0.4 }}
-              className="w-20 h-20 sm:w-24 sm:h-24 bg-gradient-to-br from-theme-accent-start to-theme-accent-end rounded-[20px] sm:rounded-[24px] flex items-center justify-center text-white shadow-2xl shadow-theme-accent-start/30 relative z-10 before:absolute before:inset-0 before:rounded-[inherit] before:border before:border-white/20"
+              className="relative z-10"
             >
-              <motion.div
-                animate={{ 
-                  boxShadow: [
-                    "0 0 0px 0px rgba(255, 255, 255, 0.2)",
-                    "0 0 20px 10px rgba(255, 255, 255, 0)",
-                    "0 0 0px 0px rgba(255, 255, 255, 0.2)"
-                  ]
-                }}
-                transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-                className="absolute inset-0 rounded-[inherit]"
-              />
-              <span className="font-heading font-black text-[3.5rem] sm:text-[4.5rem] leading-none tracking-tighter flex items-center justify-center pb-1">M</span>
+              <AppIcon size={96} className="sm:w-24 sm:h-24 w-20 h-20" />
             </motion.div>
             
             {/* Texts - Absolute positioned below so they don't affect the exact centering of the logo box */}

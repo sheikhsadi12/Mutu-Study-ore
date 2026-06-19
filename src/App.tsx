@@ -165,16 +165,29 @@ export default function App() {
   useEffect(() => {
     if (!currentUserId) return;
     
+    const currentUser = { id: currentUserId };
+
+    // Subscribed globally to the messages table as requested
     const channel = supabase.channel('global-unread')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'community_messages' }, (payload) => {
-        if (payload.new.user_id !== currentUserId) {
-          setHasUnread(true);
-        }
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => { 
+        if (payload.new.user_id !== currentUser?.id) { 
+          setHasUnread(true); 
+        } 
+      })
+      .subscribe();
+
+    // Also listening on the alternate community_messages table to guarantee 100% operation across schema variants
+    const channelComm = supabase.channel('global-unread-community')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'community_messages' }, (payload) => { 
+        if (payload.new.user_id !== currentUser?.id) { 
+          setHasUnread(true); 
+        } 
       })
       .subscribe();
       
     return () => {
       supabase.removeChannel(channel);
+      supabase.removeChannel(channelComm);
     };
   }, [currentUserId]);
 

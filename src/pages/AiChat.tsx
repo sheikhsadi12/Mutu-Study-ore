@@ -193,12 +193,6 @@ export function AiChat({ toggleTheme, isDarkMode }: any) {
 
       const systemInstruction = `You are an expert AI tutor. Use the provided context to answer the user's question perfectly in Bengali. DO NOT mention HTML.`;
 
-      const genAI = new GoogleGenerativeAI(userKey);
-      const model = genAI.getGenerativeModel({ 
-        model: "gemini-2.5-flash",
-        systemInstruction
-      });
-
       const historyToPass = currentMsgs.filter(m => m.content !== '').map(m => ({
         role: m.role,
         parts: [{ text: m.content }]
@@ -208,26 +202,79 @@ export function AiChat({ toggleTheme, isDarkMode }: any) {
         ? `Context Document:\n${contextText}\n\nUser Question:\n${currentQuery}`
         : currentQuery;
 
-      const chat = model.startChat({
-        history: historyToPass
-      });
+      const genAI = new GoogleGenerativeAI(userKey);
+      
+      const attemptStream = async (modelName: string) => {
+        const model = genAI.getGenerativeModel({ 
+          model: modelName,
+          systemInstruction
+        });
+        const chat = model.startChat({
+          history: historyToPass
+        });
+        const result = await chat.sendMessageStream([{text: actualPromptToSend}]);
+        return result.stream;
+      };
 
-      const result = await chat.sendMessageStream([{text: actualPromptToSend}]);
+      let stream;
+      let modelUsed = "gemini-2.5-flash";
+      try {
+        stream = await attemptStream(modelUsed);
+      } catch (err: any) {
+        console.warn(`Model ${modelUsed} failed to initialize. Trying fallback gemini-1.5-flash...`, err);
+        try {
+          modelUsed = "gemini-1.5-flash";
+          stream = await attemptStream(modelUsed);
+        } catch (err2: any) {
+          console.warn(`Model ${modelUsed} failed. Trying fallback gemini-2.0-flash...`, err2);
+          modelUsed = "gemini-2.0-flash";
+          stream = await attemptStream(modelUsed);
+        }
+      }
 
       let isFirstChunk = true;
-      for await (const chunk of result.stream) {
-        if (isFirstChunk) { setIsAiLoading(false); isFirstChunk = false; }
-        const chunkText = chunk.text();
-        
-        setSessions(prev => prev.map(s => {
-          if (s.id === activeId) {
-             const newMsgs = [...s.messages];
-             const lastMsg = newMsgs[newMsgs.length - 1];
-             newMsgs[newMsgs.length - 1] = { ...lastMsg, content: lastMsg.content + chunkText };
-             return { ...s, messages: newMsgs, updatedAt: Date.now() };
+      try {
+        for await (const chunk of stream) {
+          if (isFirstChunk) { setIsAiLoading(false); isFirstChunk = false; }
+          const chunkText = chunk.text();
+          
+          setSessions(prev => prev.map(s => {
+            if (s.id === activeId) {
+               const newMsgs = [...s.messages];
+               const lastMsg = newMsgs[newMsgs.length - 1];
+               newMsgs[newMsgs.length - 1] = { ...lastMsg, content: lastMsg.content + chunkText };
+               return { ...s, messages: newMsgs, updatedAt: Date.now() };
+            }
+            return s;
+          }));
+        }
+      } catch (streamErr: any) {
+        console.error("Stream reader encountered error, trying fallback stream...", streamErr);
+        if (isFirstChunk) {
+          let retryStream;
+          try {
+            modelUsed = "gemini-1.5-flash";
+            retryStream = await attemptStream(modelUsed);
+          } catch (e) {
+            modelUsed = "gemini-2.0-flash";
+            retryStream = await attemptStream(modelUsed);
           }
-          return s;
-        }));
+          for await (const chunk of retryStream) {
+            if (isFirstChunk) { setIsAiLoading(false); isFirstChunk = false; }
+            const chunkText = chunk.text();
+            setSessions(prev => prev.map(s => {
+              if (s.id === activeId) {
+                 const newMsgs = [...s.messages];
+                 const lastMsg = newMsgs[newMsgs.length - 1];
+                 newMsgs[newMsgs.length - 1] = { ...lastMsg, content: lastMsg.content + chunkText };
+                 return { ...s, messages: newMsgs, updatedAt: Date.now() };
+              }
+              return s;
+            }));
+          }
+        } else {
+          throw streamErr;
+        }
       }
     } catch (e: any) {
       console.error(e);
