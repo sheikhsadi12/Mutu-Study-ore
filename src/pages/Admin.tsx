@@ -108,10 +108,17 @@ export function Admin({ onBack }: AdminProps) {
 
       if (editNoteId) {
         try {
-          const { data, error } = await supabase.from('notes').update(payload).eq('id', editNoteId).select().single();
+          if (!editNoteId) {
+            alert("Error: Note ID is missing!");
+            return;
+          }
+          const { data, error } = await supabase.from('notes').update(payload).eq('id', editNoteId).select().maybeSingle();
           if (error) {
              console.error("Storage exception updating note:", error);
              throw new Error(error.message || "Failed to update material. Check database RLS policies.");
+          }
+          if (!data && !error) {
+             throw new Error("Update failed. No row was modified (Check ID or RLS policies).");
           }
           if (data) {
              setLocalNotes(prev => {
