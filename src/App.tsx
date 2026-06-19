@@ -26,21 +26,27 @@ function AndroidBackButtonInterceptor() {
   return null;
 }
 
-function GlobalFABs() {
+function GlobalFABs({ hasUnread, setHasUnread }: { hasUnread: boolean; setHasUnread: (v: boolean) => void }) {
   const location = useLocation();
-
   const navigate = useNavigate();
   
-  if (location.pathname !== '/') return null;
+  // Hide on community and ai-chat pages so they don't cover UI
+  if (location.pathname === '/community' || location.pathname === '/ai-chat') return null;
 
   return (
     <div id="global-fabs" className="fixed bottom-6 right-6 z-[60] flex flex-col gap-3">
       <button 
-        onClick={() => navigate('/community')}
-        className="w-12 h-12 rounded-full shadow-lg flex items-center justify-center transition-all duration-300 bg-theme-bg border border-theme-border text-theme-accent-end hover:scale-105 hover:bg-theme-muted active:scale-95"
+        onClick={() => {
+          setHasUnread(false);
+          navigate('/community');
+        }}
+        className="relative w-12 h-12 rounded-full shadow-lg flex items-center justify-center transition-all duration-300 bg-theme-bg border border-theme-border text-theme-accent-end hover:scale-105 hover:bg-theme-muted active:scale-95"
         title="Community"
       >
         <MessageCircle className="w-5 h-5" />
+        {hasUnread && (
+          <span className="absolute top-0 right-0 w-3 h-3 bg-red-500 border-2 border-[#2a020b] rounded-full animate-pulse"></span>
+        )}
       </button>
       <button 
         onClick={() => navigate('/ai-chat')}
@@ -55,7 +61,33 @@ function GlobalFABs() {
 
 export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
-  
+  const [hasUnread, setHasUnread] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setCurrentUserId(data.user?.id || null));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
+       setCurrentUserId(session?.user?.id || null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (!currentUserId) return;
+    
+    const channel = supabase.channel('global-unread')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'community_messages' }, (payload) => {
+        if (payload.new.user_id !== currentUserId) {
+          setHasUnread(true);
+        }
+      })
+      .subscribe();
+      
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentUserId]);
+
   useEffect(() => {
     const syncUserToAdminDb = async (session: any) => {
        if (!session?.user) return;
@@ -133,7 +165,7 @@ export default function App() {
       <BrowserRouter>
         <AndroidBackButtonInterceptor />
         <PWAManager />
-        <GlobalFABs />
+        <GlobalFABs hasUnread={hasUnread} setHasUnread={setHasUnread} />
         <Routes>
         <Route path="/login" element={<Login />} />
         <Route 

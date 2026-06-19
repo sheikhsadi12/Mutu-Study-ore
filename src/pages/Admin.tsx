@@ -107,12 +107,23 @@ export function Admin({ onBack }: AdminProps) {
       };
 
       if (editNoteId) {
-        const { error } = await supabase.from('notes').update(payload).eq('id', editNoteId);
-        if (error) {
-           console.error("Storage exception updating note:", error);
-           throw new Error(error.message || "Failed to update material. Check database RLS policies.");
+        try {
+          const { data, error } = await supabase.from('notes').update(payload).eq('id', editNoteId).select().single();
+          if (error) {
+             console.error("Storage exception updating note:", error);
+             throw new Error(error.message || "Failed to update material. Check database RLS policies.");
+          }
+          if (data) {
+             setLocalNotes(prev => {
+                if (!prev) return [];
+                return prev.map(item => item.id === data.id ? data : item);
+             });
+          }
+          alert("Material successfully updated!");
+        } catch (updateError: any) {
+             console.error("Error updating material:", updateError);
+             alert("Error saving material to Supabase: " + (updateError.message || 'Unknown error.'));
         }
-        alert("Material successfully updated!");
       } else {
         const payloadWithId = {
            id: crypto.randomUUID(),

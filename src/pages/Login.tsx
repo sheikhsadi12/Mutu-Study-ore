@@ -129,6 +129,9 @@ export function Login() {
             
             {!isResetPassword && (
           <>
+            <div className="bg-green-100 border border-green-300 text-green-800 dark:bg-green-900/30 dark:border-green-800 dark:text-green-300 text-sm font-bold md:text-base text-center py-2.5 px-4 rounded-xl mb-3 shadow-sm">
+              গুগল দিয়ে লগইন করুন (সবচেয়ে সহজ ও নিরাপদ)
+            </div>
             <button
               onClick={handleLogin}
               className="w-full bg-theme-border text-theme-text/90 font-bold py-3.5 md:py-4 px-6 rounded-xl md:rounded-2xl shadow-sm hover:opacity-90 flex items-center justify-center gap-3 transition-colors border border-theme-border mb-6 text-sm md:text-base"

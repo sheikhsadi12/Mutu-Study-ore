@@ -27,18 +27,50 @@ export function AiChat({ toggleTheme, isDarkMode }: any) {
   const navigate = useNavigate();
   
   // Chat Session State
-  const [sessions, setSessions] = useState<ChatSession[]>(() => {
-    const saved = localStorage.getItem('chat_sessions');
-    return saved ? JSON.parse(saved) : [];
-  });
-  const [currentSessionId, setCurrentSessionId] = useState<string | null>(() => {
-    const saved = localStorage.getItem('chat_sessions');
-    if (saved) {
-       const parsed = JSON.parse(saved);
-       return parsed.length > 0 ? parsed[0].id : null;
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [sessions, setSessions] = useState<ChatSession[]>([]);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+
+  // Initialize and listen to Auth
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setCurrentUser(data.user));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setCurrentUser(session?.user || null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // Load chat sessions when user changes
+  useEffect(() => {
+    if (currentUser?.id) {
+      const storageKey = `ai-chats-${currentUser.id}`;
+      const saved = localStorage.getItem(storageKey);
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          setSessions(parsed);
+          setCurrentSessionId(parsed.length > 0 ? parsed[0].id : null);
+        } catch (e) {
+          setSessions([]);
+          setCurrentSessionId(null);
+        }
+      } else {
+        setSessions([]);
+        setCurrentSessionId(null);
+      }
+    } else {
+      setSessions([]);
+      setCurrentSessionId(null);
     }
-    return null;
-  });
+  }, [currentUser]);
+
+  // Save chat sessions when they change
+  useEffect(() => {
+    if (currentUser?.id) {
+      const storageKey = `ai-chats-${currentUser.id}`;
+      localStorage.setItem(storageKey, JSON.stringify(sessions));
+    }
+  }, [sessions, currentUser]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 
@@ -56,10 +88,6 @@ export function AiChat({ toggleTheme, isDarkMode }: any) {
   const [showAttachMenu, setShowAttachMenu] = useState(false);
   const [allNotes, setAllNotes] = useState<Note[]>([]);
   const [attachedNoteIds, setAttachedNoteIds] = useState<Set<string>>(new Set());
-
-  useEffect(() => {
-    localStorage.setItem('chat_sessions', JSON.stringify(sessions));
-  }, [sessions]);
 
   useEffect(() => {
     const fetchNotesList = async () => {
@@ -138,52 +166,89 @@ export function AiChat({ toggleTheme, isDarkMode }: any) {
     setShowAttachMenu(false);
 
     try {
-      const genAI = new GoogleGenerativeAI(apiKey);
+      const extractPlainText = (html: string) => {
+        const doc = new DOMParser().parseFromString(html, 'text/html');
+        return doc.body.textContent || "";
+      };
       
       let contextText = "";
+
       const currentMsgs = sessions.find(s => s.id === activeId)?.messages || [];
       if (attachedNoteIds.size > 0 && currentMsgs.length <= 2) {
         const idsArray = Array.from(attachedNoteIds);
         const { data: attachedNotesData } = await supabase.from('notes').select('title, html_code').in('id', idsArray);
         if (attachedNotesData) {
-           contextText = attachedNotesData.map(n => `--- Module: ${n.title} ---\n${n.html_code?.substring(0, 5000)}`).join('\n\n');
+           contextText = attachedNotesData.map(n => `--- Module: ${n.title} ---\n${extractPlainText(n.html_code || '')}`).join('\n\n');
         }
       }
 
-      const systemInstruction = contextText 
-        ? `Context from attached notes:\n${contextText}\n\nPlease act as a helpful and knowledgeable general-purpose study assistant, answering strictly based on the provided notes.` 
-        : `Please act as a helpful and knowledgeable general-purpose study assistant.`;
+      const systemInstruction = `You are an expert AI tutor. Use the provided context to answer the user's question perfectly in Bengali. DO NOT mention HTML.`;
 
-      const model = genAI.getGenerativeModel({ 
-        model: "gemini-2.5-flash", 
-        systemInstruction
-      });
-      
       const historyToPass = currentMsgs.filter(m => m.content !== '').map(m => ({
         role: m.role,
         parts: [{ text: m.content }]
       }));
       
-      const chat = model.startChat({ history: historyToPass });
-      const result = await chat.sendMessageStream(currentQuery);
-      
-      let isFirstChunk = true;
+      const actualPromptToSend = contextText 
+        ? `Context Document:\n${contextText}\n\nUser Question:\n${currentQuery}`
+        : currentQuery;
 
-      for await (const chunk of result.stream) {
-        if (isFirstChunk) {
-          setIsAiLoading(false);
-          isFirstChunk = false;
-        }
-        const chunkText = chunk.text();
-        setSessions(prev => prev.map(s => {
-          if (s.id === activeId) {
-             const newMsgs = [...s.messages];
-             const lastMsg = newMsgs[newMsgs.length - 1];
-             newMsgs[newMsgs.length - 1] = { ...lastMsg, content: lastMsg.content + chunkText };
-             return { ...s, messages: newMsgs, updatedAt: Date.now() };
+      historyToPass.push({ role: 'user', parts: [{ text: actualPromptToSend }]});
+
+      const response = await fetch('/api/gemini', {
+         method: 'POST',
+         headers: { 'Content-Type': 'application/json' },
+         body: JSON.stringify({
+           apiKey: apiKey,
+           systemInstruction,
+           contents: historyToPass
+         })
+      });
+
+      if (!response.ok) {
+         console.error(await response.text());
+         throw new Error(`AI Error: ${response.statusText}`);
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error("No response stream");
+      const decoder = new TextDecoder();
+      let isFirstChunk = true;
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        
+        const chunks = buffer.split('\n\n');
+        buffer = chunks.pop() || "";
+        
+        for (const chunk of chunks) {
+          if (chunk.startsWith('data: ')) {
+            const dataStr = chunk.slice(6);
+            if (dataStr === '[DONE]') continue;
+            try {
+              const data = JSON.parse(dataStr);
+              if (data.text) {
+                if (isFirstChunk) { setIsAiLoading(false); isFirstChunk = false; }
+                const chunkText = data.text;
+                
+                setSessions(prev => prev.map(s => {
+                  if (s.id === activeId) {
+                     const newMsgs = [...s.messages];
+                     const lastMsg = newMsgs[newMsgs.length - 1];
+                     newMsgs[newMsgs.length - 1] = { ...lastMsg, content: lastMsg.content + chunkText };
+                     return { ...s, messages: newMsgs, updatedAt: Date.now() };
+                  }
+                  return s;
+                }));
+              }
+            } catch (err) {
+               console.error("Parse error on stream chunk:", err);
+            }
           }
-          return s;
-        }));
+        }
       }
     } catch (e: any) {
       console.error(e);

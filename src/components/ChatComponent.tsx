@@ -48,23 +48,43 @@ export function ChatComponent({ currentNote }: ChatComponentProps) {
   const [allNotes, setAllNotes] = useState<Note[]>([]);
   const [attachedNoteIds, setAttachedNoteIds] = useState<Set<string>>(new Set(currentNote ? [currentNote.id] : []));
 
+  const [currentUser, setCurrentUser] = useState<any>(null);
+
   useEffect(() => {
-    // Load sessions from local storage
-    const saved = localStorage.getItem('mutu_ai_sessions');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        setSessions(parsed);
-      } catch (e) {}
-    }
+    supabase.auth.getUser().then(({ data }) => setCurrentUser(data.user));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setCurrentUser(session?.user || null);
+    });
+    return () => subscription.unsubscribe();
   }, []);
 
   useEffect(() => {
-    // Save sessions to local storage
-    if (sessions.length > 0) {
-      localStorage.setItem('mutu_ai_sessions', JSON.stringify(sessions));
+    // Load sessions from local storage
+    if (currentUser?.id) {
+      const saved = localStorage.getItem(`mutu_ai_sessions_${currentUser.id}`);
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          setSessions(parsed);
+        } catch (e) {
+          setSessions([]);
+        }
+      } else {
+        setSessions([]);
+      }
+    } else {
+      setSessions([]);
+      setMessages([]);
+      setCurrentSessionId(null);
     }
-  }, [sessions]);
+  }, [currentUser]);
+
+  useEffect(() => {
+    // Save sessions to local storage
+    if (currentUser?.id && sessions.length > 0) {
+      localStorage.setItem(`mutu_ai_sessions_${currentUser.id}`, JSON.stringify(sessions));
+    }
+  }, [sessions, currentUser]);
 
   useEffect(() => {
     // Sync messages to current session
@@ -170,8 +190,10 @@ export function ChatComponent({ currentNote }: ChatComponentProps) {
     setShowAttachMenu(false);
 
     try {
-      const genAI = new GoogleGenerativeAI(apiKey);
-      
+      const extractPlainText = (html: string) => {
+        const doc = new DOMParser().parseFromString(html, 'text/html');
+        return doc.body.textContent || "";
+      };
       let contextText = "";
       // Only inject context on first message
       if (attachedNoteIds.size > 0 && messages.length === 0) {
@@ -179,40 +201,73 @@ export function ChatComponent({ currentNote }: ChatComponentProps) {
         const { data: attachedNotesData } = await supabase.from('notes').select('title, html_code').in('id', idsArray);
         
         if (attachedNotesData) {
-           contextText = attachedNotesData.map(n => `--- Module: ${n.title} ---\n${n.html_code?.substring(0, 5000)}`).join('\n\n');
+           contextText = attachedNotesData.map(n => `--- Module: ${n.title} ---\n${extractPlainText(n.html_code || '')}`).join('\n\n');
         }
       }
 
-      const systemInstruction = contextText 
-        ? `Context from attached notes:\n${contextText}\n\nPlease act as a helpful and knowledgeable general-purpose study assistant, answering strictly based on the provided notes.` 
-        : `Please act as a helpful and knowledgeable general-purpose study assistant.`;
+      const systemInstruction = `You are an expert AI tutor. Use the provided context to answer the user's question perfectly in Bengali. DO NOT mention HTML.`;
 
-      const model = genAI.getGenerativeModel({ 
-        model: "gemini-2.5-flash",
-        systemInstruction
-      });
+      const historyToPass = messages.map(m => ({
+        role: m.role,
+        parts: [{ text: m.content }]
+      }));
       
-      const chat = model.startChat({
-        history: messages.map(m => ({
-          role: m.role,
-          parts: [{ text: m.content }]
-        }))
+      const actualPromptToSend = contextText 
+        ? `Context Document:\n${contextText}\n\nUser Question:\n${currentQuery}`
+        : currentQuery;
+
+      historyToPass.push({ role: 'user', parts: [{ text: actualPromptToSend }]});
+
+      const response = await fetch('/api/gemini', {
+         method: 'POST',
+         headers: { 'Content-Type': 'application/json' },
+         body: JSON.stringify({
+           apiKey: apiKey,
+           systemInstruction,
+           contents: historyToPass
+         })
       });
-      
-      const result = await chat.sendMessageStream(currentQuery);
+
+      if (!response.ok) {
+         console.error(await response.text());
+         throw new Error(`AI Error: ${response.statusText}`);
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error("No response stream");
+      const decoder = new TextDecoder();
       let isFirstChunk = true;
+      let buffer = "";
 
-      for await (const chunk of result.stream) {
-        if (isFirstChunk) {
-          setIsAiLoading(false);
-          isFirstChunk = false;
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        
+        const chunks = buffer.split('\n\n');
+        buffer = chunks.pop() || "";
+        
+        for (const chunk of chunks) {
+          if (chunk.startsWith('data: ')) {
+            const dataStr = chunk.slice(6);
+            if (dataStr === '[DONE]') continue;
+            try {
+              const data = JSON.parse(dataStr);
+              if (data.text) {
+                if (isFirstChunk) { setIsAiLoading(false); isFirstChunk = false; }
+                const chunkText = data.text;
+                setMessages(prev => {
+                  const newMessages = [...prev];
+                  const lastIdx = newMessages.length - 1;
+                  newMessages[lastIdx] = { ...newMessages[lastIdx], content: newMessages[lastIdx].content + chunkText };
+                  return newMessages;
+                });
+              }
+            } catch (err) {
+               console.error("Parse error on stream chunk:", err);
+            }
+          }
         }
-        const chunkText = chunk.text();
-        setMessages(prev => {
-          const newMessages = [...prev];
-          newMessages[newMessages.length - 1].content += chunkText;
-          return newMessages;
-        });
       }
     } catch (e: any) {
       console.error(e);

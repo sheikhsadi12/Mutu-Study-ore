@@ -100,3 +100,12 @@ body.note-view-open #global-fabs {
 .dir-rtl {
   direction: rtl;
 }
+
+/* Hide scrollbar for Category chips */
+.hide-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}

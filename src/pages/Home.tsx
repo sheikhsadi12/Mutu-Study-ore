@@ -72,7 +72,7 @@ export function Home({ toggleTheme, isDarkMode, searchQuery, setSearchQuery }: a
     <div className={cn("overflow-y-auto h-full flex-1", condensed ? "p-3 md:p-4 space-y-3 bg-theme-muted/20" : "p-4 sm:p-6 lg:p-10 bg-theme-muted/10")}>
       {!condensed && (
         <div className="max-w-5xl mx-auto">
-          <div className="flex flex-col mb-4 md:mb-6 gap-3 border-b border-theme-border/50 pb-4">
+          <div className="flex flex-col mb-3 md:mb-4 gap-2 border-b border-theme-border/50 pb-2">
             <div className="flex justify-between items-center">
               <h2 className="text-theme-text/70 font-bold uppercase tracking-widest text-xs md:text-sm">Knowledge Base Modules</h2>
               <div className="flex items-center gap-1 bg-theme-muted/30 border border-theme-border/50 rounded-full p-1">
@@ -92,13 +92,13 @@ export function Home({ toggleTheme, isDarkMode, searchQuery, setSearchQuery }: a
                 </button>
               </div>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex overflow-x-auto flex-nowrap items-center gap-2 pb-1 hide-scrollbar">
               {subjects.map(f => (
                 <button 
                   key={f}
                   onClick={() => setFilter(f)}
                   className={cn(
-                    "px-3 py-1.5 md:px-4 text-[10px] md:text-xs rounded-[25px] font-bold transition-all border shadow-sm cursor-pointer",
+                    "whitespace-nowrap flex-shrink-0 px-3 py-1.5 md:px-4 text-[10px] md:text-xs rounded-[25px] font-bold transition-all border shadow-sm cursor-pointer",
                     filter === f 
                       ? "bg-gradient-to-r from-theme-accent-start to-theme-accent-end text-white border-transparent" 
                       : "bg-theme-card border-theme-border text-theme-text/80 hover:bg-theme-muted hover:text-theme-accent-end"
