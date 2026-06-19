@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Sparkles, X, Send, Bot, Loader2, Plus, FileText, CheckCircle2, Menu, ArrowLeft, PlusCircle, MessageSquare, Copy, CopyCheck, Settings } from 'lucide-react';
+import { Sparkles, X, Send, Bot, Loader2, Plus, FileText, CheckCircle2, Menu, ArrowLeft, PlusCircle, MessageSquare, Copy, CopyCheck, Settings, MoreVertical, Trash2, Edit2, Check } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { Note } from '../types';
@@ -77,6 +77,34 @@ export function AiChat({ toggleTheme, isDarkMode }: any) {
   }, [sessions, currentUser, isLoaded]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+
+  // Chat management states
+  const [activeOptionsSessionId, setActiveOptionsSessionId] = useState<string | null>(null);
+  const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState('');
+  const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null);
+
+  const handleRenameSession = (sessionId: string, currentTitle: string) => {
+    setEditingSessionId(sessionId);
+    setEditingTitle(currentTitle);
+    setActiveOptionsSessionId(null);
+  };
+
+  const handleSaveRename = (sessionId: string) => {
+    if (!editingTitle.trim()) return;
+    setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, title: editingTitle.trim() } : s));
+    setEditingSessionId(null);
+    setEditingTitle('');
+  };
+
+  const handleDeleteSession = (sessionId: string) => {
+    setSessions(prev => prev.filter(s => s.id !== sessionId));
+    if (currentSessionId === sessionId) {
+      setCurrentSessionId(null);
+    }
+    setDeletingSessionId(null);
+    setActiveOptionsSessionId(null);
+  };
 
   // Gemini State
   const [aiQuery, setAiQuery] = useState('');
@@ -343,21 +371,131 @@ export function AiChat({ toggleTheme, isDarkMode }: any) {
               </button>
             </div>
             <div className="flex-1 overflow-y-auto p-2 space-y-1">
-              {sessions.map(s => (
-                <button
-                  key={s.id}
-                  onClick={() => { setCurrentSessionId(s.id); setIsSidebarOpen(false); }}
-                  className={cn(
-                    "w-full text-left px-4 py-3 rounded-[16px] flex items-center gap-3 transition-colors text-sm",
-                    currentSessionId === s.id 
-                      ? "bg-theme-muted font-semibold text-theme-text" 
-                      : "text-theme-text/70 hover:bg-theme-muted/50"
-                  )}
-                >
-                  <MessageSquare className="w-4 h-4 shrink-0 opacity-50" />
-                  <span className="truncate flex-1">{s.title}</span>
-                </button>
-              ))}
+              {sessions.map(s => {
+                const isEditing = editingSessionId === s.id;
+                const isDeleting = deletingSessionId === s.id;
+                const isCurrent = currentSessionId === s.id;
+
+                if (isDeleting) {
+                  return (
+                    <div 
+                      key={s.id} 
+                      className="w-full flex flex-col gap-2 p-3 rounded-[16px] bg-red-500/10 border border-red-500/20 text-xs animate-in zoom-in-95 duration-150"
+                    >
+                      <span className="text-red-500 font-semibold truncate leading-tight">Delete "{s.title}"?</span>
+                      <div className="flex items-center gap-2">
+                        <button 
+                          onClick={() => handleDeleteSession(s.id)}
+                          className="flex-1 py-1 px-2 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg text-[11px] transition-colors"
+                        >
+                          Delete
+                        </button>
+                        <button 
+                          onClick={() => setDeletingSessionId(null)}
+                          className="flex-1 py-1 px-2 bg-theme-muted hover:bg-theme-muted/80 text-theme-text/80 rounded-lg text-[11px] transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  );
+                }
+
+                if (isEditing) {
+                  return (
+                    <div 
+                      key={s.id}
+                      className="w-full p-2 rounded-[16px] bg-theme-muted/30 border border-theme-accent-start/40 flex items-center gap-1.5 animate-in zoom-in-95 duration-150"
+                    >
+                      <input
+                        type="text"
+                        value={editingTitle}
+                        onChange={(e) => setEditingTitle(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleSaveRename(s.id);
+                          if (e.key === 'Escape') { setEditingSessionId(null); setEditingTitle(''); }
+                        }}
+                        className="flex-1 bg-theme-bg border border-theme-border rounded-lg py-1 px-2 text-xs text-theme-text outline-none focus:border-theme-accent-start min-w-0"
+                        autoFocus
+                      />
+                      <button 
+                        onClick={() => handleSaveRename(s.id)}
+                        className="p-1.5 bg-theme-accent-start/15 hover:bg-theme-accent-start text-theme-accent-start hover:text-white rounded-lg transition-colors shrink-0"
+                        title="Save name"
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                      </button>
+                      <button 
+                        onClick={() => { setEditingSessionId(null); setEditingTitle(''); }}
+                        className="p-1.5 bg-theme-muted hover:bg-theme-muted/80 text-theme-text/60 hover:text-theme-text rounded-lg transition-colors shrink-0"
+                        title="Cancel"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div 
+                    key={s.id} 
+                    className={cn(
+                      "group relative w-full rounded-[16px] flex items-center justify-between overflow-visible transition-colors",
+                      isCurrent 
+                        ? "bg-theme-muted text-theme-text font-semibold" 
+                        : "text-theme-text/70 hover:bg-theme-muted/30 hover:text-theme-text"
+                    )}
+                  >
+                    <button
+                      onClick={() => { setCurrentSessionId(s.id); setIsSidebarOpen(false); }}
+                      className="flex-1 text-left px-4 py-3 flex items-center gap-3 text-sm truncate rounded-l-[16px] outline-none min-w-0"
+                    >
+                      <MessageSquare className="w-4 h-4 shrink-0 opacity-50" />
+                      <span className="truncate flex-1">{s.title}</span>
+                    </button>
+
+                    <div className="flex items-center pr-2 relative shrink-0">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveOptionsSessionId(activeOptionsSessionId === s.id ? null : s.id);
+                        }}
+                        className="p-1 rounded-full text-theme-text/40 hover:text-theme-text hover:bg-theme-muted/50 transition-colors cursor-pointer"
+                        title="Options"
+                      >
+                        <MoreVertical className="w-4 h-4" />
+                      </button>
+
+                      {activeOptionsSessionId === s.id && (
+                        <>
+                          <div className="fixed inset-0 z-40" onClick={() => setActiveOptionsSessionId(null)}></div>
+                          <div className="absolute right-0 top-full mt-1 bg-theme-bg border border-theme-border/60 rounded-xl shadow-xl py-1 w-32 z-50 animate-in fade-in zoom-in-95 duration-100">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleRenameSession(s.id, s.title);
+                              }}
+                              className="w-full text-left px-3 py-2 text-xs text-theme-text/80 hover:bg-theme-muted hover:text-theme-text flex items-center gap-2"
+                            >
+                              <Edit2 className="w-3.5 h-3.5 opacity-60" /> Rename
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDeletingSessionId(s.id);
+                                setActiveOptionsSessionId(null);
+                              }}
+                              className="w-full text-left px-3 py-2 text-xs text-red-500 hover:bg-red-500/10 hover:text-red-600 flex items-center gap-2"
+                            >
+                              <Trash2 className="w-3.5 h-3.5 opacity-85" /> Delete
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
               {sessions.length === 0 && (
                 <div className="p-6 text-center text-xs text-theme-text/40 italic">
                   No previous chats

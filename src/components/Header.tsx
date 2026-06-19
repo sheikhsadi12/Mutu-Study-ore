@@ -23,18 +23,38 @@ export function Header({ toggleTheme, isDarkMode, searchQuery, setSearchQuery, a
   const [searchOpen, setSearchOpen] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [user, setUser] = useState<AuthUser | null>(null);
+  const [dbProfile, setDbProfile] = useState<{ username: string; avatar_url: string } | null>(null);
   const [geminiKey, setGeminiKey] = useState('');
   const navigate = useNavigate();
   const searchContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    const fetchProfile = async (uId: string) => {
+      const { data } = await supabase.from('profiles').select('username, avatar_url').eq('id', uId).maybeSingle();
+      if (data) {
+        setDbProfile(data);
+      }
+    };
+
     // Get current session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
+      const u = session?.user ?? null;
+      setUser(u);
+      if (u) {
+        fetchProfile(u.id);
+      } else {
+        setDbProfile(null);
+      }
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
+      const u = session?.user ?? null;
+      setUser(u);
+      if (u) {
+        fetchProfile(u.id);
+      } else {
+        setDbProfile(null);
+      }
     });
 
     const savedKey = localStorage.getItem('mutu_user_gemini_key');
@@ -102,31 +122,29 @@ export function Header({ toggleTheme, isDarkMode, searchQuery, setSearchQuery, a
           </button>
         )}
         
-        {!searchOpen && (
-          <div className="flex items-center gap-2 min-w-0">
-            {!activeNote ? (
-              <BrandLogo 
-                size={22} 
-                animate={false} 
-                showText={true} 
-                className="cursor-pointer" 
-                textClassName="text-sm md:text-lg"
-                onClick={() => navigate('/')} 
-              />
-            ) : (
-              <div 
-                className="flex items-center gap-1 sm:gap-2 cursor-pointer min-w-0"
-                onClick={() => navigate('/')}
-              >
-                <BrandLogo size={18} showText={false} />
-                <span className="text-theme-border/50 mx-1 hidden sm:inline">|</span>
-                <span className="text-xs font-semibold text-theme-text/70 truncate max-w-[120px] sm:max-w-[200px]">
-                  {activeNote.title}
-                </span>
-              </div>
-            )}
-          </div>
-        )}
+        <div className={cn("items-center gap-2 min-w-0", searchOpen ? "hidden md:flex" : "flex")}>
+          {!activeNote ? (
+            <BrandLogo 
+              size={22} 
+              animate={false} 
+              showText={true} 
+              className="cursor-pointer" 
+              textClassName="text-sm md:text-lg"
+              onClick={() => navigate('/')} 
+            />
+          ) : (
+            <div 
+              className="flex items-center gap-1 sm:gap-2 cursor-pointer min-w-0"
+              onClick={() => navigate('/')}
+            >
+              <BrandLogo size={18} showText={false} />
+              <span className="text-theme-border/50 mx-1 hidden sm:inline">|</span>
+              <span className="text-xs font-semibold text-theme-text/70 truncate max-w-[120px] sm:max-w-[200px]">
+                {activeNote.title}
+              </span>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
@@ -198,11 +216,13 @@ export function Header({ toggleTheme, isDarkMode, searchQuery, setSearchQuery, a
             onClick={() => navigate('/profile')}
             className="flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 overflow-hidden p-0 rounded-full border border-theme-border bg-theme-muted hover:border-theme-accent-end transition-colors cursor-pointer shrink-0 outline-none ring-offset-theme-bg focus-visible:ring-2 focus-visible:ring-theme-accent-end ring-offset-1"
           >
-            {user?.user_metadata?.avatar_url ? (
+            {dbProfile?.avatar_url ? (
+              <img src={dbProfile.avatar_url} alt="Profile" className="w-full h-full object-cover" />
+            ) : user?.user_metadata?.avatar_url ? (
               <img src={user.user_metadata.avatar_url} alt="Profile" className="w-full h-full object-cover" />
             ) : (
               <div className="w-full h-full flex items-center justify-center bg-theme-accent-start text-white text-[10px] sm:text-xs font-bold">
-                {user?.email?.charAt(0).toUpperCase() || 'U'}
+                {(dbProfile?.username || user?.email || 'U').charAt(0).toUpperCase()}
               </div>
             )}
           </button>

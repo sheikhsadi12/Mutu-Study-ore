@@ -13,20 +13,43 @@ interface ProfileProps {
 export function Profile({ themeMode, setThemeMode }: ProfileProps) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [communityProfile, setCommunityProfile] = useState<{username: string, avatar_url: string} | null>(null);
+  const [dbIsAdmin, setDbIsAdmin] = useState(false);
+  const [coAdmins, setCoAdmins] = useState<{ id: string; email?: string; full_name?: string; username?: string; avatar_url?: string; is_admin?: boolean }[]>([]);
   const [geminiKey, setGeminiKey] = useState('');
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
+    const loadProfileData = async (u: AuthUser) => {
+      try {
+        const { data } = await supabase.from('profiles').select('username, avatar_url, is_admin').eq('id', u.id).maybeSingle();
+        const isUserAdmin = u.email === ADMIN_EMAIL || data?.is_admin === true;
+        setDbIsAdmin(isUserAdmin);
+        
+        if (data && data.username) {
+          setCommunityProfile(data);
+        }
+
+        if (isUserAdmin) {
+          const { data: admins } = await supabase
+            .from('profiles')
+            .select('id, email, full_name, username, avatar_url, is_admin')
+            .eq('is_admin', true);
+          if (admins) {
+            setCoAdmins(admins);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load profile details:', err);
+      }
+    };
+
     const checkUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       const u = session?.user ?? null;
       setUser(u);
       if (u) {
-        const { data } = await supabase.from('profiles').select('username, avatar_url').eq('id', u.id).maybeSingle();
-        if (data && data.username) {
-          setCommunityProfile(data);
-        }
+        await loadProfileData(u);
       }
       setLoading(false);
     };
@@ -36,12 +59,11 @@ export function Profile({ themeMode, setThemeMode }: ProfileProps) {
       const u = session?.user ?? null;
       setUser(u);
       if (u) {
-        const { data } = await supabase.from('profiles').select('username, avatar_url').eq('id', u.id).maybeSingle();
-        if (data && data.username) {
-          setCommunityProfile(data);
-        }
+        await loadProfileData(u);
       } else {
         setCommunityProfile(null);
+        setDbIsAdmin(false);
+        setCoAdmins([]);
       }
       setLoading(false);
     });
@@ -115,7 +137,8 @@ export function Profile({ themeMode, setThemeMode }: ProfileProps) {
     );
   }
 
-  const isAdmin = user.email === ADMIN_EMAIL;
+  const isSystemAdmin = user.email === ADMIN_EMAIL;
+  const isActualAdmin = isSystemAdmin || dbIsAdmin;
   const createdDate = new Date(user.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
   return (
@@ -125,7 +148,9 @@ export function Profile({ themeMode, setThemeMode }: ProfileProps) {
         <button onClick={handleExitProfile} className="p-2 rounded-full hover:bg-theme-muted transition-colors text-theme-text/80 mr-3" title="Back to Home">
           <ArrowLeft className="w-5 h-5" />
         </button>
-        <h1 className="text-lg md:text-xl font-heading font-black text-theme-accent-start">User Profile</h1>
+        <h1 className="text-lg md:text-xl font-heading font-black text-theme-accent-start">
+          {isActualAdmin ? 'Admin Profile' : 'User Profile'}
+        </h1>
       </header>
 
       <main className="flex-1 w-full max-w-2xl mx-auto p-4 md:p-8 space-y-6 md:space-y-8 animate-in fade-in duration-300">
@@ -140,7 +165,7 @@ export function Profile({ themeMode, setThemeMode }: ProfileProps) {
             ) : (
               <span className="text-4xl font-black text-theme-accent-start uppercase">{user.email?.charAt(0) || 'U'}</span>
             )}
-            {isAdmin && (
+            {isActualAdmin && (
               <div className="absolute bottom-1 right-1 bg-theme-accent-end rounded-full p-1 border-2 border-theme-bg">
                 <ShieldAlert className="w-4 h-4 text-white" />
               </div>
@@ -149,13 +174,19 @@ export function Profile({ themeMode, setThemeMode }: ProfileProps) {
 
           <div className="flex-1 min-w-0">
             <h2 className="text-2xl font-bold font-heading text-theme-text truncate mb-1">
-              {user.user_metadata?.full_name || 'Student User'}
+              {user.user_metadata?.full_name || communityProfile?.username || 'Student User'}
             </h2>
             <p className="text-theme-text/70">{user.email}</p>
             
             <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3 mt-4">
-              <span className={`px-3 py-1 text-xs font-bold uppercase tracking-wider rounded-full ${isAdmin ? 'bg-theme-accent-end/10 text-theme-accent-end border border-theme-accent-end/20' : 'bg-theme-accent-start/10 text-theme-accent-start border border-theme-accent-start/20'}`}>
-                {isAdmin ? 'Master Admin' : 'Active Student'}
+              <span className={`px-3 py-1 text-xs font-bold uppercase tracking-wider rounded-full ${
+                isSystemAdmin 
+                  ? 'bg-theme-accent-end/10 text-theme-accent-end border border-theme-accent-end/20' 
+                  : dbIsAdmin 
+                  ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20' 
+                  : 'bg-theme-accent-start/10 text-theme-accent-start border border-theme-accent-start/20'
+              }`}>
+                {isSystemAdmin ? 'Master Admin' : dbIsAdmin ? 'Co-Admin' : 'Active Student'}
               </span>
               <span className="text-xs text-theme-text/50">
                 Member since {createdDate}
@@ -163,6 +194,49 @@ export function Profile({ themeMode, setThemeMode }: ProfileProps) {
             </div>
           </div>
         </section>
+
+        {/* Co-Administrators List (Only visible if the current logged-in user is an Admin) */}
+        {isActualAdmin && (
+          <section className="card-base p-6 md:p-8 rounded-[20px] shadow-sm">
+            <div className="flex items-center gap-2 mb-4 text-theme-text border-b border-theme-border/50 pb-3">
+              <ShieldAlert className="w-5 h-5 text-amber-500" />
+              <h3 className="font-heading font-bold text-lg">Co-Administrators</h3>
+            </div>
+            <p className="text-xs text-theme-text/55 leading-relaxed mb-4">
+              Below are the registered administrators holding platform moderating authority:
+            </p>
+            
+            <div className="grid gap-3">
+              {coAdmins.length === 0 ? (
+                <div className="text-xs text-theme-text/50 py-2 italic">Retrieving admin list...</div>
+              ) : (
+                coAdmins.map((admin) => (
+                  <div key={admin.id} className="flex items-center gap-3 p-3 rounded-xl bg-theme-muted/20 border border-theme-border/30">
+                    <img 
+                      src={admin.avatar_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${admin.id}`} 
+                      alt="Admin Avatar" 
+                      className="w-8 h-8 rounded-full border border-theme-border shrink-0" 
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-bold text-theme-text truncate">
+                          {admin.full_name || admin.username || 'Admin User'}
+                        </span>
+                        {admin.email === ADMIN_EMAIL && (
+                          <span className="text-[10px] scale-90 px-1.5 py-0.5 bg-theme-accent-end/15 text-theme-accent-end font-semibold rounded uppercase">System</span>
+                        )}
+                        {admin.id === user.id && (
+                          <span className="text-[10px] scale-90 px-1.5 py-0.5 bg-green-500/15 text-green-500 font-semibold rounded uppercase">You</span>
+                        )}
+                      </div>
+                      <span className="text-[10px] text-theme-text/50 block truncate">{admin.email || 'Confidential'}</span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </section>
+        )}
 
         {/* Community Profile Settings */}
         <section className="card-base p-6 md:p-8 rounded-[20px] shadow-sm">
@@ -248,7 +322,7 @@ export function Profile({ themeMode, setThemeMode }: ProfileProps) {
 
         {/* Danger Zone / Admin Zone */}
         <section className="space-y-4">
-          {isAdmin && (
+          {isActualAdmin && (
             <button onClick={() => navigate('/admin')} className="w-full flex items-center justify-center gap-3 py-4 px-6 rounded-2xl bg-gradient-to-r from-theme-accent-start to-theme-accent-end text-white font-bold shadow-md hover:opacity-90 hover:-translate-y-0.5 active:translate-y-0 transition-all text-base">
               <ShieldAlert className="w-5 h-5" /> Enter Admin Portal
             </button>
