@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Eye, EyeOff, ShieldAlert } from 'lucide-react';
+import { BrandLogo } from '../components/BrandLogo';
 
 export function Login() {
   const navigate = useNavigate();
@@ -101,7 +102,9 @@ export function Login() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-theme-bg p-4 md:p-6 flex-col">
       <div className="w-full max-w-md card-base shadow-2xl p-6 md:p-10 border border-theme-border/50 bg-theme-muted/10 backdrop-blur rounded-[20px] text-center">
-        <h1 className="text-3xl md:text-4xl font-heading font-black text-theme-accent-start mb-2 tracking-tight">MUTU STUDY</h1>
+        <div className="flex justify-center mb-6">
+          <BrandLogo size={52} vertical={true} animate={false} textClassName="text-2xl md:text-3xl font-heading font-black" />
+        </div>
         
         {loadingMaintenance ? (
            <div className="flex justify-center p-8"><div className="w-6 h-6 border-2 border-theme-accent-start border-t-transparent rounded-full animate-spin"></div></div>

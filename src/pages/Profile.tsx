@@ -14,25 +14,46 @@ export function Profile({ themeMode, setThemeMode }: ProfileProps) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [communityProfile, setCommunityProfile] = useState<{username: string, avatar_url: string} | null>(null);
   const [geminiKey, setGeminiKey] = useState('');
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    const checkUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
       const u = session?.user ?? null;
       setUser(u);
       if (u) {
-        supabase.from('profiles').select('username, avatar_url').eq('id', u.id).single().then(({data}) => {
-          if (data && data.username) {
-            setCommunityProfile(data);
-          }
-        });
+        const { data } = await supabase.from('profiles').select('username, avatar_url').eq('id', u.id).maybeSingle();
+        if (data && data.username) {
+          setCommunityProfile(data);
+        }
       }
+      setLoading(false);
+    };
+    checkUser();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      const u = session?.user ?? null;
+      setUser(u);
+      if (u) {
+        const { data } = await supabase.from('profiles').select('username, avatar_url').eq('id', u.id).maybeSingle();
+        if (data && data.username) {
+          setCommunityProfile(data);
+        }
+      } else {
+        setCommunityProfile(null);
+      }
+      setLoading(false);
     });
 
     const savedKey = localStorage.getItem('mutu_user_gemini_key');
     if (savedKey) {
       setGeminiKey(savedKey);
     }
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   const handleSaveGeminiKey = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -67,7 +88,32 @@ export function Profile({ themeMode, setThemeMode }: ProfileProps) {
     localStorage.setItem('theme_preference', mode);
   };
 
-  if (!user) return null;
+  const handleExitProfile = () => {
+    navigate('/');
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-theme-bg flex items-center justify-center font-sans">
+        <div className="w-8 h-8 border-4 border-theme-accent-start border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-theme-bg flex flex-col items-center justify-center font-sans p-4 text-center">
+        <div className="w-16 h-16 bg-red-500/15 border border-red-500/20 rounded-full flex items-center justify-center text-red-500 mb-4">
+          <ShieldAlert className="w-8 h-8" />
+        </div>
+        <h2 className="text-xl font-heading font-black text-theme-text mb-2">Access Denied</h2>
+        <p className="text-sm text-theme-text/60 max-w-sm mb-6">You must be fully authenticated to view this profile screen.</p>
+        <button onClick={() => navigate('/login')} className="px-6 py-2.5 rounded-xl bg-theme-accent-start text-white font-bold hover:opacity-90 transition-all text-sm">
+          Go to Sign In
+        </button>
+      </div>
+    );
+  }
 
   const isAdmin = user.email === ADMIN_EMAIL;
   const createdDate = new Date(user.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
@@ -76,7 +122,7 @@ export function Profile({ themeMode, setThemeMode }: ProfileProps) {
     <div className="min-h-screen bg-theme-bg flex flex-col font-sans">
       {/* Header Area */}
       <header className="h-[56px] px-4 md:px-6 flex items-center border-b border-theme-border bg-theme-bg shrink-0 z-50 sticky top-0">
-        <button onClick={() => navigate(-1)} className="p-2 rounded-full hover:bg-theme-muted transition-colors text-theme-text/80 mr-3">
+        <button onClick={handleExitProfile} className="p-2 rounded-full hover:bg-theme-muted transition-colors text-theme-text/80 mr-3" title="Back to Home">
           <ArrowLeft className="w-5 h-5" />
         </button>
         <h1 className="text-lg md:text-xl font-heading font-black text-theme-accent-start">User Profile</h1>

@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { ADMIN_EMAIL } from './PrivateRoute';
 import { User as AuthUser } from '@supabase/supabase-js';
 import { AppIcon } from './AppIcon';
+import { BrandLogo } from './BrandLogo';
 
 interface HeaderProps {
   toggleTheme: () => void;
@@ -32,6 +33,10 @@ export function Header({ toggleTheme, isDarkMode, searchQuery, setSearchQuery, a
       setUser(session?.user ?? null);
     });
 
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
     const savedKey = localStorage.getItem('mutu_user_gemini_key');
     if (savedKey) {
       setGeminiKey(savedKey);
@@ -45,6 +50,10 @@ export function Header({ toggleTheme, isDarkMode, searchQuery, setSearchQuery, a
     } catch (e) {
       console.warn('Failed to parse recent searches', e);
     }
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
@@ -95,17 +104,26 @@ export function Header({ toggleTheme, isDarkMode, searchQuery, setSearchQuery, a
         
         {!searchOpen && (
           <div className="flex items-center gap-2 min-w-0">
-            {!activeNote && <AppIcon size={24} className="hidden sm:flex shrink-0" />}
-            <h1 className="text-sm md:text-lg tracking-tight font-heading font-black text-theme-accent-start truncate shrink-0 cursor-pointer" onClick={() => navigate('/')}>
-              MUTU STUDY
-            </h1>
-            {activeNote && (
-              <>
+            {!activeNote ? (
+              <BrandLogo 
+                size={22} 
+                animate={false} 
+                showText={true} 
+                className="cursor-pointer" 
+                textClassName="text-sm md:text-lg"
+                onClick={() => navigate('/')} 
+              />
+            ) : (
+              <div 
+                className="flex items-center gap-1 sm:gap-2 cursor-pointer min-w-0"
+                onClick={() => navigate('/')}
+              >
+                <BrandLogo size={18} showText={false} />
                 <span className="text-theme-border/50 mx-1 hidden sm:inline">|</span>
-                <span className="text-xs font-semibold text-theme-text/70 truncate hidden sm:inline-block">
+                <span className="text-xs font-semibold text-theme-text/70 truncate max-w-[120px] sm:max-w-[200px]">
                   {activeNote.title}
                 </span>
-              </>
+              </div>
             )}
           </div>
         )}

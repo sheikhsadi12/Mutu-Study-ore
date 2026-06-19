@@ -15,11 +15,11 @@ export function AppIcon({ className = '', size = 96 }: AppIconProps) {
 
   return (
     <div 
-      className={`relative rounded-[28%] bg-gradient-to-br from-[#5c0f22] via-[#24010a] to-[#0c0003] flex items-center justify-center overflow-hidden border border-[#5c051d]/40 ${className}`}
+      className={`relative rounded-[28%] bg-gradient-to-br from-[#881337] via-[#4c0519] to-[#1c000a] flex items-center justify-center overflow-hidden border border-[#881337]/40 ${className}`}
       style={{ 
         width: pixelSize, 
         height: pixelSize,
-        boxShadow: 'inset 0 3px 8px rgba(0, 0, 0, 0.65), inset 0 -2px 6px rgba(255, 255, 255, 0.04), 0 10px 24px rgba(0, 0, 0, 0.5)'
+        boxShadow: 'inset 0 3px 8px rgba(0, 0, 0, 0.55), inset 0 -2px 6px rgba(255, 255, 255, 0.06), 0 10px 24px rgba(0, 0, 0, 0.4)'
       }}
     >
       {/* Precision Inner Bezel for high-end carved craft look */}

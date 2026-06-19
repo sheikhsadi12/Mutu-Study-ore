@@ -28,12 +28,12 @@ function AndroidBackButtonInterceptor() {
   return null;
 }
 
-function GlobalFABs({ hasUnread, setHasUnread }: { hasUnread: boolean; setHasUnread: (v: boolean) => void }) {
+function GlobalFABs({ hasUnread, setHasUnread, currentUserId }: { hasUnread: boolean; setHasUnread: (v: boolean) => void; currentUserId: string | null }) {
   const location = useLocation();
   const navigate = useNavigate();
   
-  // Hide on community and ai-chat pages so they don't cover UI
-  if (location.pathname === '/community' || location.pathname === '/ai-chat') return null;
+  // Show ONLY on the homepage for authenticated users
+  if (!currentUserId || location.pathname !== '/') return null;
 
   return (
     <div id="global-fabs" className="fixed bottom-6 right-6 z-[60] flex flex-col gap-3">
@@ -269,7 +269,7 @@ export default function App() {
       <BrowserRouter>
         <AndroidBackButtonInterceptor />
         <PWAManager />
-        <GlobalFABs hasUnread={hasUnread} setHasUnread={setHasUnread} />
+        <GlobalFABs hasUnread={hasUnread} setHasUnread={setHasUnread} currentUserId={currentUserId} />
         <AnimatedRoutes 
           toggleTheme={toggleTheme} 
           isDarkMode={isDarkMode}
