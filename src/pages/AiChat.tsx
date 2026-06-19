@@ -290,7 +290,7 @@ export function AiChat({ toggleTheme, isDarkMode }: any) {
             </h1>
           </div>
         </div>
-        <button onClick={() => navigate('/')} className="p-2 rounded-full hover:bg-theme-muted transition-colors text-theme-text/80">
+        <button onClick={() => navigate(-1)} className="p-2 rounded-full hover:bg-theme-muted transition-colors text-theme-text/80">
           <ArrowLeft className="w-5 h-5" />
         </button>
       </header>

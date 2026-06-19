@@ -6,7 +6,7 @@ import { User as AuthUser } from '@supabase/supabase-js';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { cn } from '../lib/utils';
 import { TextFormatter } from '../components/TextFormatter';
-import { useHardwareBack } from '../hooks/useHardwareBack';
+import { useModalBack } from '../hooks/useHardwareBack';
 
 const isArabic = (text: string) => /[\u0600-\u06FF]/.test(text || '');
 const getTextClass = (text: string) => isArabic(text) ? 'font-arabic text-[15px] leading-relaxed text-right dir-rtl' : 'font-sans text-[15px]';
@@ -230,13 +230,13 @@ export function Community() {
   const [adminUserStatus, setAdminUserStatus] = useState<{is_banned: boolean, suspended_until: string | null} | null>(null);
   const [isChatDisabled, setIsChatDisabled] = useState(false);
 
-  useHardwareBack(showSetup, () => {
+  useModalBack(showSetup, () => {
     // We cannot just close setup if they don't have a profile, otherwise they can't chat.
     // If they press back on setup with no profile, maybe send them back to home?
     if (!profile?.username) navigate('/');
     else setShowSetup(false);
   });
-  useHardwareBack(selectedAdminProfile !== null, () => setSelectedAdminProfile(null));
+  useModalBack(selectedAdminProfile !== null, () => setSelectedAdminProfile(null));
 
   const subscriptionRef = useRef<any>(null);
   const controlsSubscriptionRef = useRef<any>(null);
@@ -444,7 +444,8 @@ export function Community() {
       }
       
       setProfile(payload as ProfileData);
-      setShowSetup(false);
+      if (showSetup) window.history.back();
+      else setShowSetup(false);
       fetchMessages();
       setupRealtimeSubscription(user.id);
     } catch (e: any) {
@@ -593,7 +594,7 @@ export function Community() {
     <div className="flex flex-col h-[100dvh] bg-theme-bg font-sans overflow-hidden">
       <header className="h-[56px] px-4 md:px-6 flex items-center border-b border-theme-border bg-theme-bg shrink-0 z-40 sticky top-0 justify-between w-full">
         <div className="flex items-center">
-            <button onClick={() => navigate('/')} className="p-2 rounded-full hover:bg-theme-muted transition-colors text-theme-text/80 mr-3 shrink-0">
+            <button onClick={() => navigate(-1)} className="p-2 rounded-full hover:bg-theme-muted transition-colors text-theme-text/80 mr-3 shrink-0">
             <ArrowLeft className="w-5 h-5" />
             </button>
             <div className="flex items-center gap-3">
@@ -640,7 +641,10 @@ export function Community() {
            
            <div className="card-base p-6 md:p-8 w-full max-w-md relative z-10 rounded-[24px] shadow-xl border border-theme-border/50 transform-gpu will-change-transform">
              {profile && (
-                 <button onClick={() => setShowSetup(false)} className="absolute top-4 right-4 p-2 rounded-full hover:bg-theme-muted text-theme-text/50 transition-colors hover:text-theme-text">
+                 <button onClick={() => {
+                   if (showSetup) window.history.back();
+                   else setShowSetup(false);
+                 }} className="absolute top-4 right-4 p-2 rounded-full hover:bg-theme-muted text-theme-text/50 transition-colors hover:text-theme-text">
                     <X className="w-5 h-5" />
                  </button>
              )}
@@ -762,7 +766,10 @@ export function Community() {
       {isAdmin && selectedAdminProfile && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-[200]">
           <div className="bg-theme-bg border border-theme-border rounded-3xl p-6 w-full max-w-sm shadow-xl relative transform-gpu will-change-transform">
-             <button onClick={() => setSelectedAdminProfile(null)} className="absolute top-4 right-4 p-2 rounded-full hover:bg-theme-muted transition-colors text-theme-text/60">
+             <button onClick={() => {
+               if (selectedAdminProfile) window.history.back();
+               else setSelectedAdminProfile(null);
+             }} className="absolute top-4 right-4 p-2 rounded-full hover:bg-theme-muted transition-colors text-theme-text/60">
                 <X className="w-5 h-5" />
              </button>
              
@@ -840,7 +847,8 @@ export function Community() {
                                try {
                                  await supabase.from('profiles').update({ is_banned: true }).eq('id', selectedAdminProfile.user_id);
                                  await supabase.from('community_messages').delete().eq('user_id', selectedAdminProfile.user_id);
-                                 setSelectedAdminProfile(null);
+                                 if (selectedAdminProfile) window.history.back();
+                                 else setSelectedAdminProfile(null);
                                } catch (err) { console.error(err); }
                             }}
                             className="w-full bg-red-500/10 hover:bg-red-500/20 text-red-600 border border-red-500/30 rounded-xl py-3 font-bold flex items-center justify-center gap-2 transition-all shadow-sm"
@@ -850,7 +858,10 @@ export function Community() {
                       </>
                    )}
                    <button 
-                      onClick={() => setSelectedAdminProfile(null)}
+                      onClick={() => {
+                       if (selectedAdminProfile) window.history.back();
+                       else setSelectedAdminProfile(null);
+                     }}
                       className="w-full mt-2 text-theme-text/60 hover:text-theme-text/90 font-medium py-2 rounded-xl hover:bg-theme-muted/50 transition-colors"
                    >
                       Close

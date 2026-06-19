@@ -76,7 +76,7 @@ export function Profile({ themeMode, setThemeMode }: ProfileProps) {
     <div className="min-h-screen bg-theme-bg flex flex-col font-sans">
       {/* Header Area */}
       <header className="h-[56px] px-4 md:px-6 flex items-center border-b border-theme-border bg-theme-bg shrink-0 z-50 sticky top-0">
-        <button onClick={() => navigate('/')} className="p-2 rounded-full hover:bg-theme-muted transition-colors text-theme-text/80 mr-3">
+        <button onClick={() => navigate(-1)} className="p-2 rounded-full hover:bg-theme-muted transition-colors text-theme-text/80 mr-3">
           <ArrowLeft className="w-5 h-5" />
         </button>
         <h1 className="text-lg md:text-xl font-heading font-black text-theme-accent-start">User Profile</h1>

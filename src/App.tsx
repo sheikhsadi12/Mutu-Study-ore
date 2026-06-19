@@ -21,10 +21,10 @@ import { AdminDashboard } from './pages/AdminDashboard';
 
 import { PWAManager } from './components/PWAManager';
 import { SplashScreen } from './components/SplashScreen';
-import { useAndroidBackButton } from './hooks/useHardwareBack';
+import { useHardwareBack } from './hooks/useHardwareBack';
 
 function AndroidBackButtonInterceptor() {
-  useAndroidBackButton();
+  useHardwareBack();
   return null;
 }
 

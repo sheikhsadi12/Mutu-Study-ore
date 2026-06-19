@@ -7,7 +7,7 @@ import { Note } from "../types";
 import { supabase } from "../supabaseClient";
 import { DynamicCodeViewer } from "../components/DynamicCodeViewer";
 import { Comments } from "../components/Comments";
-import { useHardwareBack } from "../hooks/useHardwareBack";
+import { useModalBack } from "../hooks/useHardwareBack";
 import { cn } from "../lib/utils";
 
 interface NoteViewProps {
@@ -23,9 +23,9 @@ export function NoteView({ note, onBack, isDarkMode = false }: NoteViewProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Trap back button to exit the NoteView content view
-  useHardwareBack(true, onBack);
+  useModalBack(true, onBack);
   // Trap back button to exit Fullscreen without exiting NoteView
-  useHardwareBack(isFullscreen, () => setIsFullscreen(false));
+  useModalBack(isFullscreen, () => setIsFullscreen(false));
 
   useEffect(() => {
     document.body.classList.add("note-view-open");
@@ -101,7 +101,10 @@ export function NoteView({ note, onBack, isDarkMode = false }: NoteViewProps) {
               <RotateCw className="w-4 h-4" />
             </button>
             <button
-              onClick={() => setIsFullscreen(false)}
+              onClick={() => {
+                if (isFullscreen) window.history.back();
+                else setIsFullscreen(false);
+              }}
               className="bg-red-500/10 text-red-500 p-2 rounded-full shadow-md hover:bg-red-500/20 transition-colors w-8 h-8 flex items-center justify-center border border-red-500/20"
               title="Exit Fullscreen"
             >

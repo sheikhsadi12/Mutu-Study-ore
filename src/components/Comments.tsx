@@ -4,7 +4,7 @@ import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { supabase } from "../supabaseClient";
 import { cn } from "../lib/utils";
 import { TextFormatter } from "./TextFormatter";
-import { useHardwareBack } from "../hooks/useHardwareBack";
+import { useModalBack } from "../hooks/useHardwareBack";
 
 const isArabic = (text: string) => /[\u0600-\u06FF]/.test(text || '');
 const getTextClass = (text: string) => isArabic(text) ? 'font-arabic text-[15px] leading-relaxed text-right dir-rtl' : 'font-sans text-[15px]';
@@ -43,8 +43,8 @@ export function Comments({ noteId }: { noteId: string }) {
   const [adminUserStatus, setAdminUserStatus] = useState<{is_banned: boolean, suspended_until: string | null} | null>(null);
   const [isCommentsDisabled, setIsCommentsDisabled] = useState(false);
 
-  useHardwareBack(isOpen, () => setIsOpen(false));
-  useHardwareBack(selectedAdminProfile !== null, () => setSelectedAdminProfile(null));
+  useModalBack(isOpen, () => setIsOpen(false));
+  useModalBack(selectedAdminProfile !== null, () => setSelectedAdminProfile(null));
 
   const subscriptionRef = useRef<any>(null);
   const controlsSubscriptionRef = useRef<any>(null);
@@ -292,7 +292,10 @@ export function Comments({ noteId }: { noteId: string }) {
       {/* Header */}
       <div className="flex items-center justify-between p-3 border-b border-theme-border bg-theme-bg shadow-sm z-10 shrink-0">
         <div className="flex items-center gap-3">
-          <button onClick={() => setIsOpen(false)} className="p-2 -ml-2 rounded-full hover:bg-theme-muted transition-colors">
+          <button onClick={() => {
+            if (isOpen) window.history.back();
+            else setIsOpen(false);
+          }} className="p-2 -ml-2 rounded-full hover:bg-theme-muted transition-colors">
             <ChevronLeft className="w-6 h-6" />
           </button>
           <div className="flex flex-col">
@@ -390,7 +393,10 @@ export function Comments({ noteId }: { noteId: string }) {
       {isAdmin && selectedAdminProfile && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-[200]">
           <div className="bg-theme-bg border border-theme-border rounded-3xl p-6 w-full max-w-sm shadow-xl relative transform-gpu will-change-transform">
-             <button onClick={() => setSelectedAdminProfile(null)} className="absolute top-4 right-4 p-2 rounded-full hover:bg-theme-muted transition-colors text-theme-text/60">
+             <button onClick={() => {
+               if (selectedAdminProfile) window.history.back();
+               else setSelectedAdminProfile(null);
+             }} className="absolute top-4 right-4 p-2 rounded-full hover:bg-theme-muted transition-colors text-theme-text/60">
                 <X className="w-5 h-5" />
              </button>
              
@@ -468,7 +474,8 @@ export function Comments({ noteId }: { noteId: string }) {
                                try {
                                  await supabase.from('profiles').update({ is_banned: true }).eq('id', selectedAdminProfile.user_id);
                                  await supabase.from('note_comments').delete().eq('user_id', selectedAdminProfile.user_id);
-                                 setSelectedAdminProfile(null);
+                                 if (selectedAdminProfile) window.history.back();
+                                 else setSelectedAdminProfile(null);
                                } catch (err) { console.error(err); }
                             }}
                             className="w-full bg-red-500/10 hover:bg-red-500/20 text-red-600 border border-red-500/30 rounded-xl py-3 font-bold flex items-center justify-center gap-2 transition-all shadow-sm"
@@ -478,7 +485,10 @@ export function Comments({ noteId }: { noteId: string }) {
                       </>
                    )}
                    <button 
-                      onClick={() => setSelectedAdminProfile(null)}
+                      onClick={() => {
+                       if (selectedAdminProfile) window.history.back();
+                       else setSelectedAdminProfile(null);
+                     }}
                       className="w-full mt-2 text-theme-text/60 hover:text-theme-text/90 font-medium py-2 rounded-xl hover:bg-theme-muted/50 transition-colors"
                    >
                       Close

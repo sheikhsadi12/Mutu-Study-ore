@@ -258,7 +258,13 @@ export function Home({ toggleTheme, isDarkMode, searchQuery, setSearchQuery }: a
         searchQuery={searchQuery} 
         setSearchQuery={setSearchQuery}
         activeNote={activeNote}
-        onBack={() => setActiveNote(null)}
+        onBack={() => {
+          if (activeNote) {
+             window.history.back(); // Triggers useModalBack listener in NoteView
+          } else {
+             setActiveNote(null);
+          }
+        }}
       />
       
       {/* UNIFIED EXACT ARCHITECTURE */}

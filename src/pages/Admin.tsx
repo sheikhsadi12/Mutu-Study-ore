@@ -13,7 +13,7 @@ export function Admin({ onBack }: AdminProps) {
 
   const handleBack = () => {
     if (onBack) onBack();
-    else navigate('/');
+    else navigate(-1);
   };
 
   const [isAuthenticated, setIsAuthenticated] = useState(true); // Always true via private route

@@ -310,7 +310,7 @@ export function AdminDashboard() {
       <header className="h-[70px] px-6 flex items-center justify-between border-b border-theme-border bg-theme-bg sticky top-0 z-40">
         <div className="flex items-center gap-4">
           <button
-            onClick={() => navigate('/')}
+            onClick={() => navigate(-1)}
             className="p-2 rounded-full hover:bg-theme-muted transition-colors text-theme-text/80"
           >
             <ArrowLeft className="w-5 h-5" />

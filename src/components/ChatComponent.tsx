@@ -338,7 +338,7 @@ export function ChatComponent({ currentNote }: ChatComponentProps) {
                <Menu className="w-5 h-5" />
              </button>
           )}
-          <button onClick={() => navigate('/')} className="p-2 rounded-full hover:bg-theme-muted transition-colors text-theme-text/80 mr-3 shrink-0 hidden md:block">
+          <button onClick={() => navigate(-1)} className="p-2 rounded-full hover:bg-theme-muted transition-colors text-theme-text/80 mr-3 shrink-0 hidden md:block">
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div className="flex items-center gap-3">

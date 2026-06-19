@@ -1,81 +1,52 @@
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
-const backHandlersStack: Array<() => void> = [];
-let programmaticBacks = 0;
-
-export function useHardwareBack(isOpen: boolean, closeUi: () => void) {
-  const closeUiRef = useRef(closeUi);
-
-  useEffect(() => {
-    closeUiRef.current = closeUi;
-  }, [closeUi]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const modalId = Date.now() + Math.random();
-    window.history.pushState({ isAppHistory: true, modal: true, modalId }, '');
-    
-    const handler = () => {
-      if (closeUiRef.current) closeUiRef.current();
-    };
-
-    backHandlersStack.push(handler);
-
-    return () => {
-      const idx = backHandlersStack.indexOf(handler);
-      if (idx !== -1) {
-        backHandlersStack.splice(idx, 1);
-        setTimeout(() => {
-          // Check if the current state is the EXACT modal state we pushed
-          if (window.history.state?.modalId === modalId) {
-             programmaticBacks++;
-             window.history.back();
-          }
-        }, 0);
-      }
-    };
-  }, [isOpen]);
-}
-
-// Global layout hook to trap hardware back button
-export function useAndroidBackButton() {
+/**
+ * Bulletproof global hook explicitly intercepting the Android back button.
+ * Forces it to use React Router's back navigation, never allowing the PWA to 
+ * close unless the user is on the absolute root path '/'.
+ */
+export function useHardwareBack() {
   const location = useLocation();
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Forcefully push a state for the route to ensure history length > 1
-    window.history.pushState({ isAppHistory: true, path: location.pathname }, '');
+    // Push a dummy state when entering a new route to ensure the history stack is never empty.
+    // This allows the OS to 'pop' a state instead of explicitly closing the application.
+    if (location.pathname !== '/') {
+      window.history.pushState({ pwa: true }, '', window.location.href);
+    }
 
-    const handlePopState = (e: PopStateEvent) => {
-      if (programmaticBacks > 0) {
-        programmaticBacks--;
-        return;
-      }
-
-      if (backHandlersStack.length > 0) {
-        // If a modal/overlay is open, close the top-most one
-        const closeTopModal = backHandlersStack.pop();
-        if (closeTopModal) closeTopModal();
-        
-        // Prevent actual backward navigation by pushing the state back
-        window.history.pushState({ isAppHistory: true, path: location.pathname }, '');
-        return;
-      }
-
-      // If no modals are open
+    const handlePopState = (event: PopStateEvent) => {
       if (location.pathname !== '/') {
-        // Use React Router to safely go backwards within the app
+        // We are on a subpage and the user pressed the hardware back button.
+        // Navigate to the previous page to mimic a professional app.
         navigate(-1);
-      } else {
-        // We are at the root (/) and the user pressed back.
-        // Force the app to stay alive by repushing a state
-        window.history.pushState({ isAppHistory: true, path: location.pathname }, '');
       }
+      // If location.pathname === '/', do nothing, allowing the default browser behavior (app closes).
     };
 
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, [location.pathname, navigate]);
+}
+
+/**
+ * Target hardware back for modals and overlays.
+ */
+export function useModalBack(isOpen: boolean, onBack: () => void) {
+  useEffect(() => {
+    if (isOpen) {
+      window.history.pushState({ isModal: true }, '');
+
+      const handlePopState = (e: PopStateEvent) => {
+        onBack();
+      };
+
+      window.addEventListener('popstate', handlePopState);
+      return () => {
+        window.removeEventListener('popstate', handlePopState);
+      };
+    }
+  }, [isOpen, onBack]);
 }
