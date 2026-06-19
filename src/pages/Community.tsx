@@ -28,11 +28,13 @@ interface Message {
   username: string;
   avatar_url: string;
   reply_to_id?: string | null;
+  reactions?: Record<string, string[]> | null;
 }
 
 const AVATAR_SEEDS = ['bot1', 'bot2', 'bot3', 'bot4', 'bot5', 'bot6', 'bot7', 'bot8'];
+const REACTIONS = ['❤️', '👍', '😂', '😮', '😢', '🙏'];
 
-const ChatBubble = React.memo(({ msg, isMe, showHeader, isAdmin, onDelete, onBan, onViewProfile, repliedMsg, onReply }: { msg: Message, isMe: boolean, showHeader: boolean, isAdmin: boolean, onDelete: (id: string) => void, onBan: (userId: string) => void, onViewProfile: (msg: Message) => void, repliedMsg?: Message | null, onReply: (msg: Message) => void }) => {
+const ChatBubble = React.memo(({ msg, isMe, showHeader, isAdmin, currentUser, onDelete, onBan, onViewProfile, repliedMsg, onReply, onReact }: { msg: Message, isMe: boolean, showHeader: boolean, isAdmin: boolean, currentUser: AuthUser, onDelete: (id: string) => void, onBan: (userId: string) => void, onViewProfile: (msg: Message) => void, repliedMsg?: Message | null, onReply: (msg: Message) => void, onReact: (msgId: string, emoji: string) => void }) => {
   const [copied, setCopied] = useState(false);
 
   const isMsgAdmin = msg.avatar_url?.includes('#admin') || false;
@@ -44,6 +46,9 @@ const ChatBubble = React.memo(({ msg, isMe, showHeader, isAdmin, onDelete, onBan
       setCopied(false);
     }, 2000);
   };
+  
+  // Compute total reactions for badges
+  const reactionEntries = msg.reactions ? Object.entries(msg.reactions).filter(([_, users]) => users.length > 0) : [];
 
   return (
     <div className={cn("flex flex-col w-full relative", isMe ? "items-end" : "items-start", !showHeader ? "mt-1" : "mt-4")}>
@@ -65,29 +70,55 @@ const ChatBubble = React.memo(({ msg, isMe, showHeader, isAdmin, onDelete, onBan
               isAdmin={isAdmin}
               copied={copied}
               onReply={() => onReply(msg)}
+              onReact={(emoji: string) => onReact(msg.id, emoji)}
               onCopy={handleCopy}
               onDelete={() => onDelete(msg.id)}
            />
         )}
         
-        <div 
-          className={cn(
-            "w-fit max-w-[80%] px-3 py-1.5 whitespace-pre-wrap break-words relative transform-gpu will-change-transform text-[15px]",
-            isMsgAdmin 
-              ? "bg-theme-muted text-theme-text rounded-[18px] shadow-sm border border-theme-accent-start/40 font-medium" 
-              : isMe 
-                ? "bg-theme-accent-start text-white shadow-sm" 
-                : "bg-theme-card border border-theme-border/70 text-theme-text shadow-sm",
-            isMe ? "rounded-[18px] rounded-br-[4px]" : "rounded-[18px] rounded-bl-[4px]"
+        <div className={cn("flex flex-col", isMe ? "items-end" : "items-start")}>
+          <div 
+            className={cn(
+              "w-fit max-w-[80vw] sm:max-w-[80%] px-3 py-1.5 whitespace-pre-wrap break-words relative transform-gpu will-change-transform text-[15px]",
+              isMsgAdmin 
+                ? "bg-theme-muted text-theme-text rounded-[18px] shadow-sm border border-theme-accent-start/40 font-medium" 
+                : isMe 
+                  ? "bg-theme-accent-start text-white shadow-sm" 
+                  : "bg-theme-card border border-theme-border/70 text-theme-text shadow-sm",
+              isMe ? "rounded-[18px] rounded-br-[4px]" : "rounded-[18px] rounded-bl-[4px]"
+            )}
+          >
+            {repliedMsg && (
+               <div className="mb-1 bg-black/10 dark:bg-white/10 p-1.5 rounded-lg border-l-2 border-theme-accent-end/50 text-[11px] leading-tight opacity-90 font-sans">
+                 <span className="font-bold opacity-75">{repliedMsg.username}</span>
+                 <div className="truncate opacity-80 mt-0.5"><TextFormatter text={repliedMsg.message} /></div>
+               </div>
+            )}
+            <TextFormatter text={msg.message} />
+          </div>
+          
+          {reactionEntries.length > 0 && (
+            <div className={cn("flex flex-wrap gap-1 mt-1 z-10", isMe ? "justify-end mr-1" : "justify-start ml-1")}>
+              {reactionEntries.map(([emoji, users]) => {
+                const hasReacted = users.includes(currentUser.id);
+                return (
+                  <button 
+                    key={emoji}
+                    onClick={() => onReact(msg.id, emoji)}
+                    className={cn(
+                      "px-1.5 py-0.5 rounded-full text-[11px] font-bold flex items-center gap-1 shadow-sm border transition-colors cursor-pointer active:scale-95",
+                      hasReacted 
+                        ? "bg-theme-accent-start/20 border-theme-accent-start/30 text-theme-accent-start" 
+                        : "bg-theme-card border-theme-border text-theme-text/80 hover:bg-theme-muted"
+                    )}
+                  >
+                    <span>{emoji}</span>
+                    <span>{users.length}</span>
+                  </button>
+                );
+              })}
+            </div>
           )}
-        >
-          {repliedMsg && (
-             <div className="mb-1 bg-black/10 dark:bg-white/10 p-1.5 rounded-lg border-l-2 border-theme-accent-end/50 text-[11px] leading-tight opacity-90 font-sans">
-               <span className="font-bold opacity-75">{repliedMsg.username}</span>
-               <div className="truncate opacity-80 mt-0.5"><TextFormatter text={repliedMsg.message} /></div>
-             </div>
-          )}
-          <TextFormatter text={msg.message} />
         </div>
 
         {!isMe && (
@@ -95,6 +126,7 @@ const ChatBubble = React.memo(({ msg, isMe, showHeader, isAdmin, onDelete, onBan
               isMe={isMe}
               isAdmin={isAdmin}
               copied={copied}
+              onReact={(emoji: string) => onReact(msg.id, emoji)}
               onReply={() => onReply(msg)}
               onCopy={handleCopy}
               onDelete={() => onDelete(msg.id)}
@@ -256,6 +288,39 @@ export function Community() {
       alert('Failed to delete message.');
     }
   }, []);
+
+  const handleReaction = React.useCallback(async (messageId: string, emoji: string) => {
+    if (!user) return;
+    try {
+      const msg = messages.find(m => m.id === messageId);
+      if (!msg) return;
+
+      const currentReactions: Record<string, string[]> = msg.reactions || {};
+      const usersWithThisEmoji = currentReactions[emoji] || [];
+      const hasReacted = usersWithThisEmoji.includes(user.id);
+
+      let newUsers = [...usersWithThisEmoji];
+      if (hasReacted) {
+        newUsers = newUsers.filter(id => id !== user.id);
+      } else {
+        newUsers.push(user.id);
+      }
+
+      const newReactions = { ...currentReactions, [emoji]: newUsers };
+      
+      // Optimistic update
+      setMessages(prev => prev.map(m => m.id === messageId ? { ...m, reactions: newReactions } : m));
+
+      // DB update
+      const { error } = await supabase.from('community_messages').update({ reactions: newReactions }).eq('id', messageId);
+      if (error) {
+         fetchMessages(); // Revert on error
+         throw error;
+      }
+    } catch (e) {
+      console.error('Error reacting to message', e);
+    }
+  }, [messages, user]);
 
   const handleBanUser = React.useCallback(async (userId: string) => {
     if (!window.confirm("Are you sure you want to ban this user?")) return;
@@ -424,6 +489,13 @@ export function Community() {
         { event: 'DELETE', schema: 'public', table: 'community_messages' },
         (payload) => {
           setMessages(prev => prev.filter(m => m.id !== payload.old.id));
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'community_messages' },
+        (payload) => {
+          setMessages(prev => prev.map(m => m.id === payload.new.id ? payload.new as Message : m));
         }
       )
       .on(
@@ -639,11 +711,13 @@ export function Community() {
                    isMe={isMe} 
                    showHeader={showHeader}
                    isAdmin={isAdmin}
+                   currentUser={user}
                    repliedMsg={repliedMsg}
                    onDelete={handleDeleteMessage}
                    onBan={handleBanUser}
                    onViewProfile={setSelectedAdminProfile}
                    onReply={setReplyingTo}
+                   onReact={handleReaction}
                  />;
                })
             )}
@@ -778,7 +852,7 @@ export function Community() {
   );
 }
 
-export function MessageMenu({ isMe, isAdmin, copied, onReply, onCopy, onDelete, onViewProfile, onBan }: any) {
+export function MessageMenu({ isMe, isAdmin, copied, onReply, onReact, onCopy, onDelete, onViewProfile, onBan }: any) {
   return (
     <DropdownMenu.Root modal={false}>
       <DropdownMenu.Trigger asChild>
@@ -796,6 +870,18 @@ export function MessageMenu({ isMe, isAdmin, copied, onReply, onCopy, onDelete, 
            collisionPadding={20}
            avoidCollisions={true}
         >
+          <div className="flex items-center justify-between px-2 py-2 mb-1 border-b border-theme-border/50">
+             {REACTIONS.map(r => (
+                <button 
+                  key={r} 
+                  onClick={(e) => { e.preventDefault(); onReact(r); }}
+                  className="text-lg hover:scale-125 transition-transform transform-gpu flex-1"
+                >
+                  {r}
+                </button>
+             ))}
+          </div>
+
           <DropdownMenu.Item className="flex items-center gap-2 px-2 py-2 text-xs text-theme-text hover:bg-theme-muted/50 rounded-lg outline-none cursor-pointer select-none font-medium transition-colors" onSelect={onReply}>
             <Reply className="w-3.5 h-3.5" /> Reply
           </DropdownMenu.Item>

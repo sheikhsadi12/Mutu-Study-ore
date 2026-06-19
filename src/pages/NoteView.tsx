@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Maximize2, X } from "lucide-react";
+import { Maximize2, X, Printer, RotateCw } from "lucide-react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
@@ -8,6 +8,7 @@ import { supabase } from "../supabaseClient";
 import { DynamicCodeViewer } from "../components/DynamicCodeViewer";
 import { Comments } from "../components/Comments";
 import { useHardwareBack } from "../hooks/useHardwareBack";
+import { cn } from "../lib/utils";
 
 interface NoteViewProps {
   note: Note;
@@ -18,6 +19,7 @@ interface NoteViewProps {
 export function NoteView({ note, onBack, isDarkMode = false }: NoteViewProps) {
   const [fullNote, setFullNote] = useState<Note | null>(note);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isFallbackRotated, setIsFallbackRotated] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Trap back button to exit the NoteView content view
@@ -27,8 +29,20 @@ export function NoteView({ note, onBack, isDarkMode = false }: NoteViewProps) {
 
   useEffect(() => {
     document.body.classList.add("note-view-open");
-    return () => document.body.classList.remove("note-view-open");
+    return () => {
+      document.body.classList.remove("note-view-open");
+      if (document.fullscreenElement) {
+        document.exitFullscreen().catch(console.warn);
+      }
+    };
   }, []);
+
+  useEffect(() => {
+    if (!isFullscreen && document.fullscreenElement) {
+       document.exitFullscreen().catch(console.warn);
+       setIsFallbackRotated(false);
+    }
+  }, [isFullscreen]);
 
   useEffect(() => {
     if (note.html_code) {
@@ -46,23 +60,65 @@ export function NoteView({ note, onBack, isDarkMode = false }: NoteViewProps) {
     fetchNote();
   }, [note]);
 
+  const handleRotate = async () => {
+    try {
+      if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+        await document.documentElement.requestFullscreen();
+      }
+      
+      // Explicitly checking screen.orientation for TypeScript
+      const screenObj = window.screen as any;
+      if (screenObj && screenObj.orientation && screenObj.orientation.lock) {
+        const currentType = screenObj.orientation.type;
+        const newLock = currentType.startsWith("landscape") ? "portrait" : "landscape";
+        await screenObj.orientation.lock(newLock);
+      } else {
+        throw new Error("Screen Orientation API not supported on this device/browser.");
+      }
+    } catch (e) {
+      console.warn("Native screen rotation failed, using CSS fallback", e);
+      setIsFallbackRotated(prev => !prev);
+    }
+  };
+
+  const handlePrint = () => {
+    window.print();
+  };
+
   return (
     <div
       className={`flex flex-col h-full bg-theme-bg overflow-hidden ${isFullscreen ? "fixed inset-0 z-50 w-full" : "relative w-full"}`}
     >
       {/* Scrollable Content Area */}
       <div 
-        className="w-full flex-1 overflow-y-auto overflow-x-hidden relative" 
+        className={cn("w-full flex-1 overflow-y-auto overflow-x-hidden relative print-content transition-transform duration-300 transform-gpu", isFallbackRotated ? "rotate-90 origin-center min-w-[100vh] min-h-[100vw]" : "")} 
         ref={scrollRef}
+        style={isFallbackRotated ? { width: '100vh', height: '100vw', margin: 'auto', left: '50%', top: '50%', transform: 'translate(-50%, -50%) rotate(90deg)' } : {}}
       >
         {isFullscreen ? (
-          <button
-            onClick={() => setIsFullscreen(false)}
-            className="fixed top-4 right-4 z-[60] bg-theme-card text-theme-text p-2 rounded-full shadow-md hover:bg-theme-muted transition-colors w-8 h-8 flex items-center justify-center border border-theme-border"
-            title="Exit Fullscreen"
-          >
-            <X className="w-4 h-4" />
-          </button>
+          <div className="fixed top-4 right-4 z-[60] flex items-center gap-2 no-print">
+            <button
+              onClick={handlePrint}
+              className="bg-theme-card text-theme-text p-2 rounded-full shadow-md hover:bg-theme-muted transition-colors w-8 h-8 flex items-center justify-center border border-theme-border"
+              title="Save as PDF / Print"
+            >
+              <Printer className="w-4 h-4" />
+            </button>
+            <button
+              onClick={handleRotate}
+              className="bg-theme-card text-theme-text p-2 rounded-full shadow-md hover:bg-theme-muted transition-colors w-8 h-8 flex items-center justify-center border border-theme-border"
+              title="Rotate Screen"
+            >
+              <RotateCw className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setIsFullscreen(false)}
+              className="bg-red-500/10 text-red-500 p-2 rounded-full shadow-md hover:bg-red-500/20 transition-colors w-8 h-8 flex items-center justify-center border border-red-500/20"
+              title="Exit Fullscreen"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         ) : (
           <div className="absolute top-2 right-2 z-20 flex items-center gap-2">
             {fullNote?.pdf_link && (

@@ -109,3 +109,11 @@ body.note-view-open #global-fabs {
 .hide-scrollbar::-webkit-scrollbar {
   display: none;
 }
+
+@media print {
+  @page { size: A4; margin: 20mm; }
+  body * { visibility: hidden; }
+  .print-content, .print-content * { visibility: visible; }
+  .print-content { position: absolute; left: 0; top: 0; width: 100%; color: black !important; background: white !important; overflow: visible !important; height: auto !important; }
+  .no-print { display: none !important; }
+}
