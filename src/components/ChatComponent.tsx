@@ -58,6 +58,8 @@ export function ChatComponent({ currentNote }: ChatComponentProps) {
     return () => subscription.unsubscribe();
   }, []);
 
+  const [isLoaded, setIsLoaded] = useState(false);
+
   useEffect(() => {
     // Load sessions from local storage
     if (currentUser?.id) {
@@ -72,19 +74,21 @@ export function ChatComponent({ currentNote }: ChatComponentProps) {
       } else {
         setSessions([]);
       }
+      setIsLoaded(true);
     } else {
       setSessions([]);
       setMessages([]);
       setCurrentSessionId(null);
+      setIsLoaded(false);
     }
   }, [currentUser]);
 
   useEffect(() => {
     // Save sessions to local storage
-    if (currentUser?.id && sessions.length > 0) {
+    if (isLoaded && currentUser?.id && sessions.length > 0) {
       localStorage.setItem(`mutu_ai_sessions_${currentUser.id}`, JSON.stringify(sessions));
     }
-  }, [sessions, currentUser]);
+  }, [sessions, currentUser, isLoaded]);
 
   useEffect(() => {
     // Sync messages to current session

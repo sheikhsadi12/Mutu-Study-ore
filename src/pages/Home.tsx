@@ -72,7 +72,7 @@ export function Home({ toggleTheme, isDarkMode, searchQuery, setSearchQuery }: a
     <div className={cn("overflow-y-auto h-full flex-1", condensed ? "p-3 md:p-4 space-y-3 bg-theme-muted/20" : "p-4 sm:p-6 lg:p-10 bg-theme-muted/10")}>
       {!condensed && (
         <div className="max-w-5xl mx-auto">
-          <div className="flex flex-col mb-3 md:mb-4 gap-2 border-b border-theme-border/50 pb-2">
+          <div className="flex flex-col mb-1 md:mb-1 gap-1 border-b border-theme-border/50 pb-1">
             <div className="flex justify-between items-center">
               <h2 className="text-theme-text/70 font-bold uppercase tracking-widest text-xs md:text-sm">Knowledge Base Modules</h2>
               <div className="flex items-center gap-1 bg-theme-muted/30 border border-theme-border/50 rounded-full p-1">

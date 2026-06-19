@@ -40,6 +40,8 @@ export function AiChat({ toggleTheme, isDarkMode }: any) {
     return () => subscription.unsubscribe();
   }, []);
 
+  const [isLoaded, setIsLoaded] = useState(false);
+
   // Load chat sessions when user changes
   useEffect(() => {
     if (currentUser?.id) {
@@ -58,19 +60,21 @@ export function AiChat({ toggleTheme, isDarkMode }: any) {
         setSessions([]);
         setCurrentSessionId(null);
       }
+      setIsLoaded(true);
     } else {
       setSessions([]);
       setCurrentSessionId(null);
+      setIsLoaded(false);
     }
   }, [currentUser]);
 
   // Save chat sessions when they change
   useEffect(() => {
-    if (currentUser?.id) {
+    if (isLoaded && currentUser?.id) {
       const storageKey = `ai-chats-${currentUser.id}`;
       localStorage.setItem(storageKey, JSON.stringify(sessions));
     }
-  }, [sessions, currentUser]);
+  }, [sessions, currentUser, isLoaded]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 

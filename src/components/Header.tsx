@@ -158,6 +158,15 @@ export function Header({ toggleTheme, isDarkMode, searchQuery, setSearchQuery, a
           </div>
         )}
 
+        {activeNote?.type === 'STATIC_A4' && (
+          <button
+            onClick={() => window.print()}
+            className="p-1.5 sm:p-2 rounded-full hover:bg-theme-muted transition-colors text-theme-text/80 outline-none"
+            title="Save as PDF / Print"
+          >
+            <Printer className="w-4 h-4 sm:w-5 sm:h-5" />
+          </button>
+        )}
         <button 
           onClick={toggleTheme} 
           className="p-1.5 sm:p-2 rounded-full hover:bg-theme-muted transition-colors text-theme-text/80 outline-none"

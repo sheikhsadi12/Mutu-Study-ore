@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Maximize2, X, Printer, RotateCw } from "lucide-react";
+import { Maximize2, X, RotateCw } from "lucide-react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
@@ -81,10 +81,6 @@ export function NoteView({ note, onBack, isDarkMode = false }: NoteViewProps) {
     }
   };
 
-  const handlePrint = () => {
-    window.print();
-  };
-
   return (
     <div
       className={`flex flex-col h-full bg-theme-bg overflow-hidden ${isFullscreen ? "fixed inset-0 z-50 w-full" : "relative w-full"}`}
@@ -97,13 +93,6 @@ export function NoteView({ note, onBack, isDarkMode = false }: NoteViewProps) {
       >
         {isFullscreen ? (
           <div className="fixed top-4 right-4 z-[60] flex items-center gap-2 no-print">
-            <button
-              onClick={handlePrint}
-              className="bg-theme-card text-theme-text p-2 rounded-full shadow-md hover:bg-theme-muted transition-colors w-8 h-8 flex items-center justify-center border border-theme-border"
-              title="Save as PDF / Print"
-            >
-              <Printer className="w-4 h-4" />
-            </button>
             <button
               onClick={handleRotate}
               className="bg-theme-card text-theme-text p-2 rounded-full shadow-md hover:bg-theme-muted transition-colors w-8 h-8 flex items-center justify-center border border-theme-border"
