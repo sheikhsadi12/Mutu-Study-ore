@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Header } from '../components/Header';
 import { NoteView } from './NoteView';
 import { Note } from '../types';
@@ -7,6 +8,7 @@ import { cn } from '../lib/utils';
 import { supabase } from '../supabaseClient';
 
 export function Home({ toggleTheme, isDarkMode, searchQuery, setSearchQuery }: any) {
+  const navigate = useNavigate();
   const [activeNote, setActiveNote] = useState<Note | null>(null);
   const [filter, setFilter] = useState('All');
   const [notes, setNotes] = useState<Note[]>([]);
@@ -262,7 +264,7 @@ export function Home({ toggleTheme, isDarkMode, searchQuery, setSearchQuery }: a
           if (activeNote) {
              window.history.back(); // Triggers useModalBack listener in NoteView
           } else {
-             setActiveNote(null);
+             navigate('/');
           }
         }}
       />

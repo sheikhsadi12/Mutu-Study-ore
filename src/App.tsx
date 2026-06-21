@@ -8,6 +8,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from
 import { OfflineNotification } from './components/OfflineNotification';
 import { motion, AnimatePresence } from 'motion/react';
 import { Home } from './pages/Home';
+import { Dashboard } from './pages/Dashboard';
 import { Admin } from './pages/Admin';
 import { Login } from './pages/Login';
 import { PrivateRoute } from './components/PrivateRoute';
@@ -85,6 +86,21 @@ function AnimatedRoutes({ toggleTheme, isDarkMode, searchQuery, setSearchQuery, 
           <Route path="/login" element={<PageTransition><Login /></PageTransition>} />
           <Route 
             path="/" 
+            element={
+              <PrivateRoute>
+                <PageTransition>
+                  <Dashboard 
+                    toggleTheme={toggleTheme} 
+                    isDarkMode={isDarkMode}
+                    searchQuery={searchQuery}
+                    setSearchQuery={setSearchQuery}
+                  />
+                </PageTransition>
+              </PrivateRoute>
+            } 
+          />
+          <Route 
+            path="/notes" 
             element={
               <PrivateRoute>
                 <PageTransition>
@@ -259,7 +275,9 @@ export default function App() {
     });
   };
 
-  const isDarkMode = document.documentElement.classList.contains('dark');
+  const isDarkMode = themeMode === 'system'
+    ? (typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+    : themeMode === 'dark';
 
 
   return (

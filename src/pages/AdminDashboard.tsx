@@ -35,6 +35,12 @@ export function AdminDashboard() {
   const [loadingControls, setLoadingControls] = useState(true);
   const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null);
 
+  // Dynamic Dashboard settings states
+  const [noticeText, setNoticeText] = useState('নোটিশ: আগামীকাল ইংরেজি ২য় পত্রের মডেল টেস্ট। প্রস্তুতি নিতে ভুলবে না!');
+  const [countdownDate, setCountdownDate] = useState('2026-08-01T00:00:00');
+  const [savingConfig, setSavingConfig] = useState(false);
+  const [loadingConfig, setLoadingConfig] = useState(true);
+
   useEffect(() => {
     let isMounted = true;
 
@@ -102,8 +108,32 @@ export function AdminDashboard() {
       }
     };
 
+    const loadDashboardConfig = async () => {
+      try {
+        const { data } = await supabase
+          .from('notes')
+          .select('*')
+          .eq('subject', 'SYSTEM_CONFIG')
+          .maybeSingle();
+        if (data && data.html_code && isMounted) {
+          try {
+            const parsed = JSON.parse(data.html_code);
+            if (parsed.noticeText) setNoticeText(parsed.noticeText);
+            if (parsed.countdownDate) setCountdownDate(parsed.countdownDate);
+          } catch (jsonErr) {
+            console.error("Error parsing dashboard config JSON:", jsonErr);
+          }
+        }
+      } catch (err) {
+        console.error("Error loading dashboard configuration row:", err);
+      } finally {
+        if (isMounted) setLoadingConfig(false);
+      }
+    };
+
     loadInitialData();
     loadSystemControls();
+    loadDashboardConfig();
 
     const profilesChannel = supabase.channel('public:profiles');
     
@@ -300,6 +330,41 @@ export function AdminDashboard() {
     }
   };
 
+  const handleSaveDashboardConfig = async () => {
+    setSavingConfig(true);
+    try {
+      localStorage.setItem('system_notice_text', noticeText);
+      localStorage.setItem('system_countdown_date', countdownDate);
+
+      const { data: userData } = await supabase.auth.getUser();
+      const userId = userData?.user?.id;
+      if (!userId) {
+        alert("Authorization error: User details could not be found.");
+        return;
+      }
+
+      const { error } = await supabase
+        .from('notes')
+        .upsert({
+          id: '00000000-0000-0000-0000-000000001000',
+          title: 'System Dashboard Config',
+          subject: 'SYSTEM_CONFIG',
+          type: 'config',
+          html_code: JSON.stringify({ noticeText, countdownDate }),
+          user_id: userId,
+          created_at: new Date().toISOString()
+        });
+
+      if (error) throw error;
+      alert("Dashboard settings updated and synchronized successfully!");
+    } catch (e: any) {
+      console.error(e);
+      alert("Error synchronizing settings globally: " + (e.message || "Network exception. Registered on local session."));
+    } finally {
+      setSavingConfig(false);
+    }
+  };
+
   const filteredUsers = users.filter(u => 
       u.email?.toLowerCase().includes(searchTerm.toLowerCase()) || 
       u.full_name?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -392,6 +457,73 @@ export function AdminDashboard() {
               })}
             </div>
           )}
+        </div>
+        )}
+
+        {/* System Dashboard Config (Notice & Countdown Date) */}
+        {currentUserEmail === 'sadishekh671@gmail.com' && (
+        <div className="bg-theme-card border border-theme-border p-6 rounded-[24px] shadow-sm space-y-6">
+          <div className="flex items-center gap-3 border-b border-theme-border/50 pb-4">
+            <div className="p-2 rounded-full bg-amber-500/15 text-amber-600">
+              <Settings className="w-5 h-5 animate-spin-slow" />
+            </div>
+            <div>
+              <h2 className="text-xl font-heading font-black text-theme-text uppercase tracking-wide">কনফিগারেশন কন্ট্রোল (Dashboard Configuration)</h2>
+              <p className="text-xs text-theme-text/50 font-bold uppercase tracking-widest mt-0.5">Set Global Notice Announcement & Exam Countdown</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Notice Input */}
+            <div className="space-y-2">
+              <label className="block text-xs font-black uppercase tracking-wider text-theme-text/75">
+                নোটিশ বোর্ড টেক্সট (Notice Board Announcement Text)
+              </label>
+              <textarea
+                value={noticeText}
+                onChange={(e) => setNoticeText(e.target.value)}
+                placeholder="Write global notice board/alert marquee content..."
+                rows={3}
+                className="w-full px-4 py-3 rounded-xl bg-theme-bg border border-theme-border text-theme-text font-sans font-medium text-sm focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none transition-all"
+              />
+              <p className="text-[10px] text-theme-text/40 font-bold uppercase tracking-widest leading-normal">
+                This notice floats dynamically inside the top ticker marquee of the student's dashboard.
+              </p>
+            </div>
+
+            {/* Countdown Input */}
+            <div className="space-y-2">
+              <label className="block text-xs font-black uppercase tracking-wider text-theme-text/75">
+                পরীক্ষার তারিখ ও সময় নির্ধারণ (Exam Date & Time Countdown)
+              </label>
+              <input
+                type="datetime-local"
+                value={countdownDate.substring(0, 16)}
+                onChange={(e) => setCountdownDate(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl bg-theme-bg border border-theme-border text-theme-text font-mono font-bold text-sm focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none transition-all"
+              />
+              <p className="text-[10px] text-theme-text/40 font-bold uppercase tracking-widest leading-normal">
+                Adjusts the real-time exam countdown clock of the student's dashboard dynamically.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end pt-4 border-t border-theme-border/30">
+            <button
+              onClick={handleSaveDashboardConfig}
+              disabled={savingConfig}
+              className="px-6 py-3 bg-[#ea580c] hover:bg-amber-600 text-white font-extrabold text-xs uppercase tracking-widest rounded-xl hover:brightness-110 active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-sm disabled:opacity-50"
+            >
+              {savingConfig ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  <span>সংরক্ষণ হচ্ছে...</span>
+                </>
+              ) : (
+                <span>সেটিংস্ সংরক্ষণ করুন (Save Settings)</span>
+              )}
+            </button>
+          </div>
         </div>
         )}
 

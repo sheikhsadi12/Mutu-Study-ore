@@ -3,7 +3,7 @@ import { User, CheckCircle2, Settings, LogOut, Search, Moon, Sun, MonitorSmartph
 import { cn } from '../lib/utils';
 import { Note } from '../types';
 import { supabase } from '../supabaseClient';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { ADMIN_EMAIL } from './PrivateRoute';
 import { User as AuthUser } from '@supabase/supabase-js';
 import { AppIcon } from './AppIcon';
@@ -26,6 +26,7 @@ export function Header({ toggleTheme, isDarkMode, searchQuery, setSearchQuery, a
   const [dbProfile, setDbProfile] = useState<{ username: string; avatar_url: string } | null>(null);
   const [geminiKey, setGeminiKey] = useState('');
   const navigate = useNavigate();
+  const location = useLocation();
   const searchContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -116,11 +117,21 @@ export function Header({ toggleTheme, isDarkMode, searchQuery, setSearchQuery, a
   return (
     <header className="h-[48px] px-2 md:px-4 flex items-center justify-between border-b border-theme-border bg-theme-bg shrink-0 z-50 relative w-full">
       <div className="flex items-center gap-1.5 md:gap-3 min-w-0">
-        {activeNote && onBack && (
-          <button onClick={onBack} className="p-1.5 md:p-2 rounded-full hover:bg-theme-muted transition-colors text-theme-text/80 shrink-0">
+        {(activeNote && onBack) || location.pathname !== '/' ? (
+          <button 
+            onClick={() => {
+              if (activeNote && onBack) {
+                onBack();
+              } else {
+                navigate('/');
+              }
+            }} 
+            className="p-1.5 md:p-2 rounded-full hover:bg-theme-muted transition-colors text-theme-text/80 shrink-0"
+            id="back-btn-header"
+          >
             <ArrowLeft className="w-5 h-5" />
           </button>
-        )}
+        ) : null}
         
         <div className={cn("items-center gap-2 min-w-0", searchOpen ? "hidden md:flex" : "flex")}>
           {!activeNote ? (
