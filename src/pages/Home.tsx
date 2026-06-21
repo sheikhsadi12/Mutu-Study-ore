@@ -46,7 +46,11 @@ export function Home({ toggleTheme, isDarkMode, searchQuery, setSearchQuery }: a
         });
       }
 
-      const { data, error } = await supabase.from('notes').select('*').order('created_at', { ascending: false });
+      const { data, error } = await supabase
+        .from('notes')
+        .select('*')
+        .neq('subject', 'SYSTEM_CONFIG')
+        .order('created_at', { ascending: false });
       if (error) {
         console.error('Error fetching notes', error);
       } else if (data) {
@@ -60,6 +64,7 @@ export function Home({ toggleTheme, isDarkMode, searchQuery, setSearchQuery }: a
   }, []);
 
   const filteredNotes = notes.filter((n: Note) => {
+    if (n.subject === 'SYSTEM_CONFIG') return false;
     const matchesSubject = filter === 'All' || n.subject === filter;
     const searchMatch = searchQuery === '' || 
       n.title.toLowerCase().includes(searchQuery.toLowerCase()) || 

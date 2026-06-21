@@ -28,7 +28,7 @@ export function Admin({ onBack }: AdminProps) {
   const [type, setType] = useState<'STATIC_A4' | 'DYNAMIC_APPLET'>('STATIC_A4');
   const [description, setDescription] = useState('');
   const [rawHtmlText, setRawHtmlText] = useState('');
-  const [pdfLink, setPdfLink] = useState('');
+  const [pdf_url, setPdf_url] = useState('');
 
   // Data State
   const [localNotes, setLocalNotes] = useState<Note[]>([]);
@@ -83,8 +83,8 @@ export function Admin({ onBack }: AdminProps) {
 
   const handleUploadSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title || !rawHtmlText || !subject) {
-      alert("Title, Subject and Raw HTML are required.");
+    if (!title || !subject || (!rawHtmlText && !pdf_url)) {
+      alert("Please provide either text content OR a PDF link.");
       return;
     }
 
@@ -103,7 +103,7 @@ export function Admin({ onBack }: AdminProps) {
         type: type,
         description: description,
         html_code: rawHtmlText,
-        pdf_link: pdfLink,
+        pdf_link: pdf_url,
       };
 
       if (editNoteId) {
@@ -154,7 +154,7 @@ export function Admin({ onBack }: AdminProps) {
       setDescription('');
       setSubject('');
       setRawHtmlText('');
-      setPdfLink('');
+      setPdf_url('');
       setActiveTab('manage');
     } catch (error: any) {
       console.warn("Storage exception handling:", error);
@@ -169,7 +169,7 @@ export function Admin({ onBack }: AdminProps) {
     setType(note.type);
     setDescription(note.description);
     setRawHtmlText(note.html_code);
-    setPdfLink(note.pdf_link || '');
+    setPdf_url(note.pdf_link || (note as any).pdf_url || '');
     setActiveTab('upload');
   };
 
@@ -332,13 +332,13 @@ export function Admin({ onBack }: AdminProps) {
                 </div>
 
                 <div className="flex flex-col gap-1.5 mt-2">
-                    <label className="text-[10px] md:text-xs font-bold text-theme-text/70 uppercase">PDF or Resource Link (Optional)</label>
-                    <input type="url" value={pdfLink} onChange={(e) => setPdfLink(e.target.value)} placeholder="e.g. Google Drive, Dropbox, or any web link..."  className="px-3 py-2 bg-theme-bg border border-theme-border rounded-md text-xs md:text-sm focus:border-theme-accent-end outline-none shadow-sm" />
+                    <label className="text-[10px] md:text-xs font-bold text-theme-text/70 uppercase">Google Drive PDF Link (OPTIONAL IF CONTENT IS PROVIDED)</label>
+                    <input type="text" value={pdf_url} onChange={(e) => setPdf_url(e.target.value)} placeholder="e.g. Paste Google Drive shareable link here..." className="px-3 py-2 bg-theme-bg border border-theme-border rounded-md text-xs md:text-sm focus:border-theme-accent-end outline-none shadow-sm" />
                 </div>
 
                 <div className="flex flex-col gap-1.5 mt-2">
-                    <label className="text-[10px] md:text-xs font-bold text-theme-text/70 uppercase flex items-center gap-1"><Code className="w-3 h-3"/> Content (Markdown or HTML) *</label>
-                    <textarea required rows={12} value={rawHtmlText} onChange={(e) => setRawHtmlText(e.target.value)} placeholder="# Heading\n\nWrite your Markdown content here..." className="px-3 py-3 font-mono bg-[#1e1e1e] border border-theme-border rounded-md text-xs text-white focus:border-theme-accent-end outline-none shadow-inner" />
+                    <label className="text-[10px] md:text-xs font-bold text-theme-text/70 uppercase flex items-center gap-1"><Code className="w-3 h-3"/> Content (OPTIONAL IF PDF LINK IS PROVIDED)</label>
+                    <textarea rows={12} value={rawHtmlText} onChange={(e) => setRawHtmlText(e.target.value)} placeholder="# Heading\n\nWrite your Markdown content here..." className="px-3 py-3 font-mono bg-[#1e1e1e] border border-theme-border rounded-md text-xs text-white focus:border-theme-accent-end outline-none shadow-inner" />
                 </div>
 
                 <button type="submit" className="bg-gradient-to-r from-theme-accent-start to-theme-accent-end text-white rounded-[25px] px-6 py-2.5 font-medium transition-all hover:opacity-90 shadow-md mt-4 w-full">

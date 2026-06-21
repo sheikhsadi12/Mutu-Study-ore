@@ -125,7 +125,10 @@ export function ChatComponent({ currentNote }: ChatComponentProps) {
 
   useEffect(() => {
     const fetchNotesList = async () => {
-      const { data } = await supabase.from('notes').select('id, title, subject');
+      const { data } = await supabase
+        .from('notes')
+        .select('id, title, subject')
+        .neq('subject', 'SYSTEM_CONFIG');
       if (data) {
         setAllNotes(data as Note[]);
       }

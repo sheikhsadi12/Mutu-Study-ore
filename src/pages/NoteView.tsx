@@ -10,6 +10,31 @@ import { Comments } from "../components/Comments";
 import { useModalBack } from "../hooks/useHardwareBack";
 import { cn } from "../lib/utils";
 
+function getPdfEmbedUrl(url: string | undefined): string | undefined {
+  if (!url) return undefined;
+  if (url.includes("drive.google.com")) {
+    let embedUrl = url;
+    if (embedUrl.includes("open?id=")) {
+      const match = embedUrl.match(/open\?id=([^&]+)/);
+      if (match && match[1]) {
+        embedUrl = `https://drive.google.com/file/d/${match[1]}/preview`;
+      }
+    } else if (embedUrl.includes("/view")) {
+      embedUrl = embedUrl.replace(/\/view.*/, "/preview");
+    } else if (embedUrl.includes("/edit")) {
+      embedUrl = embedUrl.replace(/\/edit.*/, "/preview");
+    } else if (!embedUrl.endsWith("/preview") && embedUrl.includes("/d/")) {
+      const parts = embedUrl.split("/");
+      const dIndex = parts.indexOf("d");
+      if (dIndex !== -1 && parts[dIndex + 1]) {
+        embedUrl = `https://drive.google.com/file/d/${parts[dIndex + 1]}/preview`;
+      }
+    }
+    return embedUrl;
+  }
+  return url;
+}
+
 interface NoteViewProps {
   note: Note;
   onBack: () => void;
@@ -21,6 +46,9 @@ export function NoteView({ note, onBack, isDarkMode = false }: NoteViewProps) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isFallbackRotated, setIsFallbackRotated] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Safe checks for user's pdf_link or pdf_url
+  const pdfUrl = fullNote?.pdf_link || (fullNote as any)?.pdf_url;
 
   // Trap back button to exit the NoteView content view
   useModalBack(true, onBack);
@@ -136,14 +164,25 @@ export function NoteView({ note, onBack, isDarkMode = false }: NoteViewProps) {
 
         <div
           className={
-            fullNote?.html_code && !fullNote.html_code.startsWith("data:application/pdf")
+            pdfUrl
+              ? "w-full max-w-5xl mx-auto p-2 md:p-4 relative flex flex-col"
+              : fullNote?.html_code && !fullNote.html_code.startsWith("data:application/pdf")
               ? "w-full min-h-full p-0 m-0 relative flex flex-col"
               : note.type === "STATIC_A4"
               ? `max-w-[794px] w-full mx-auto p-0 m-0 relative min-h-full ${isDarkMode ? "bg-white" : ""}`
               : "w-full min-h-full p-0 m-0 relative"
           }
         >
-          {!fullNote?.html_code ? (
+          {pdfUrl ? (
+            <div className="w-full p-2 md:p-3 flex flex-col gap-4">
+              <iframe
+                src={getPdfEmbedUrl(pdfUrl)}
+                className="w-full h-[80vh] md:h-screen rounded-xl border border-[#7c2d12]/30 shadow-lg bg-white"
+                allow="autoplay"
+                title="Google Drive PDF Reader"
+              ></iframe>
+            </div>
+          ) : !fullNote?.html_code ? (
             <div className="flex items-center justify-center min-h-[50vh] opacity-50 font-sans">
               Loading material...
             </div>
