@@ -113,35 +113,44 @@ export function NoteView({ note, onBack, isDarkMode = false }: NoteViewProps) {
     <div
       className={`flex flex-col h-full bg-theme-bg overflow-hidden ${isFullscreen ? "fixed inset-0 z-50 w-full" : "relative w-full"}`}
     >
-      {/* Scrollable Content Area */}
-      <div 
-        className={cn("w-full flex-1 overflow-y-auto overflow-x-hidden relative print-content transition-transform duration-300 transform-gpu", isFallbackRotated ? "rotate-90 origin-center min-w-[100vh] min-h-[100vw]" : "")} 
-        ref={scrollRef}
-        style={isFallbackRotated ? { width: '100vh', height: '100vw', margin: 'auto', left: '50%', top: '50%', transform: 'translate(-50%, -50%) rotate(90deg)' } : {}}
-      >
-        {isFullscreen ? (
-          <div className="fixed top-4 right-4 z-[60] flex items-center gap-2 no-print">
+      {/* Fullscreen Header Bar */}
+      {isFullscreen && (
+        <div className="w-full bg-theme-bg/95 backdrop-blur border-b border-theme-border py-2 px-4 flex items-center justify-between z-[60] no-print shrink-0 h-12">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="font-heading font-semibold text-xs md:text-sm text-theme-text/80 truncate">
+              {fullNote?.title}
+            </span>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
             <button
               onClick={handleRotate}
-              className="bg-theme-card text-theme-text p-2 rounded-full shadow-md hover:bg-theme-muted transition-colors w-8 h-8 flex items-center justify-center border border-theme-border"
+              className="bg-theme-card text-theme-text p-1.5 rounded-full border border-theme-border shadow-sm hover:bg-theme-muted transition-colors w-8 h-8 flex items-center justify-center"
               title="Rotate Screen"
             >
               <RotateCw className="w-4 h-4" />
             </button>
             <button
               onClick={() => {
-                if (isFullscreen) window.history.back();
-                else setIsFullscreen(false);
+                setIsFullscreen(false);
               }}
-              className="bg-red-500/10 text-red-500 p-2 rounded-full shadow-md hover:bg-red-500/20 transition-colors w-8 h-8 flex items-center justify-center border border-red-500/20"
+              className="bg-red-500/10 text-red-500 p-1.5 rounded-full border border-red-500/20 shadow-sm hover:bg-red-500/20 transition-colors w-8 h-8 flex items-center justify-center"
               title="Exit Fullscreen"
             >
               <X className="w-4 h-4" />
             </button>
           </div>
-        ) : (
+        </div>
+      )}
+
+      {/* Scrollable Content Area */}
+      <div 
+        className={cn("w-full flex-1 overflow-y-auto overflow-x-hidden relative print-content transition-transform duration-300 transform-gpu", isFallbackRotated ? "rotate-90 origin-center min-w-[100vh] min-h-[100vw]" : "")} 
+        ref={scrollRef}
+        style={isFallbackRotated ? { width: '100vh', height: '100vw', margin: 'auto', left: '50%', top: '50%', transform: 'translate(-50%, -50%) rotate(90deg)' } : {}}
+      >
+        {!isFullscreen && (
           <div className="absolute top-2 right-2 z-20 flex items-center gap-2">
-            {fullNote?.pdf_link && (
+            {fullNote?.pdf_link && !pdfUrl && (
               <a
                 href={fullNote.pdf_link}
                 target="_blank"
@@ -165,7 +174,7 @@ export function NoteView({ note, onBack, isDarkMode = false }: NoteViewProps) {
         <div
           className={
             pdfUrl
-              ? "w-full max-w-5xl mx-auto p-2 md:p-4 relative flex flex-col"
+              ? "w-full h-full relative flex flex-col"
               : fullNote?.html_code && !fullNote.html_code.startsWith("data:application/pdf")
               ? "w-full min-h-full p-0 m-0 relative flex flex-col"
               : note.type === "STATIC_A4"
@@ -174,10 +183,13 @@ export function NoteView({ note, onBack, isDarkMode = false }: NoteViewProps) {
           }
         >
           {pdfUrl ? (
-            <div className="w-full p-2 md:p-3 flex flex-col gap-4">
+            <div className="w-full h-full flex flex-col">
               <iframe
                 src={getPdfEmbedUrl(pdfUrl)}
-                className="w-full h-[80vh] md:h-screen rounded-xl border border-[#7c2d12]/30 shadow-lg bg-white"
+                className={cn(
+                  "w-full bg-white block border-none",
+                  isFullscreen ? "h-[calc(100vh-48px)]" : "h-[75vh]"
+                )}
                 allow="autoplay"
                 title="Google Drive PDF Reader"
               ></iframe>
