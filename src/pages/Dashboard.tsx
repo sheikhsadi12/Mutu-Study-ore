@@ -352,20 +352,12 @@ export function Dashboard({ toggleTheme, isDarkMode, searchQuery, setSearchQuery
                 <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 relative z-10 w-full">
                   <div className="flex items-start sm:items-center gap-4">
                     {/* Floating Masterwork Icon Wrapper */}
-                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#4c0519] to-[#7c2d12] text-white flex items-center justify-center border-2 border-[#e8c3a2]/50 shadow-md group-hover:scale-105 transition-transform shrink-0 relative">
+                    <div className="w-[49px] h-[49px] rounded-2xl bg-gradient-to-br from-[#4c0519] to-[#7c2d12] text-white flex items-center justify-center border-2 border-[#e8c3a2]/50 shadow-md group-hover:scale-105 transition-transform shrink-0 relative">
                       <div className="absolute inset-0 bg-white/5 rounded-2xl animate-pulse"></div>
-                      <FileText className="w-7 h-7 text-[#e5c2a1]" />
+                      <FileText className="w-6 h-6 text-[#e5c2a1]" />
                     </div>
                     <div>
-                      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-                        <span className="px-2.5 py-0.5 rounded-full bg-[#4c0519] text-[#e8c3a2] font-black text-[9px] uppercase tracking-widest leading-none border border-[#e8c3a2]/40">
-                          প্রধান ফিচার • CORE HUB
-                        </span>
-                        <span className="inline-flex items-center text-[#7c2d12] dark:text-[#e8c3a2] font-bold text-xs">
-                          ★ স্পেশাল সাজেশন
-                        </span>
-                      </div>
-                      <h4 className="font-heading font-black text-xl md:text-2xl text-theme-text mt-1.5 group-hover:text-theme-accent-start transition-colors flex items-center gap-2">
+                      <h4 className="font-heading font-black text-xl md:text-2xl text-theme-text group-hover:text-theme-accent-start transition-colors flex items-center gap-2">
                         নোট ও সাজেশন্স (Notes & suggestions)
                       </h4>
                       <p className="text-xs text-theme-text/80 mt-1 uppercase tracking-wider font-semibold">
