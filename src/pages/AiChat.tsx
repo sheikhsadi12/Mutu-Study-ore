@@ -223,9 +223,8 @@ export function AiChat({ toggleTheme, isDarkMode }: any) {
 
       const activeSession = sessions.find(s => s.id === activeId) || { messages: [] };
       const currentMsgs = activeSession.messages;
-      const isFirstMessage = currentMsgs.length === 0; // Only user's first query before state updates
       
-      if (attachedNoteIds.size > 0 && isFirstMessage) {
+      if (attachedNoteIds.size > 0) {
         const idsArray = Array.from(attachedNoteIds);
         const { data: attachedNotesData, error: notesError } = await supabase.from('notes').select('title, html_code, description').in('id', idsArray);
         if (notesError) {
@@ -253,7 +252,7 @@ export function AiChat({ toggleTheme, isDarkMode }: any) {
       }));
       
       const actualPromptToSend = contextText 
-        ? `Context Document:\n${contextText}\n\nUser Question:\n${currentQuery}`
+        ? `Context: ${contextText}\n\nUser Question: ${currentQuery}`
         : currentQuery;
 
       historyToPass.push({

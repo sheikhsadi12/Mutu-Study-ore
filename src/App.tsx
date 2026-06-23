@@ -19,6 +19,7 @@ import { Profile } from './pages/Profile';
 import { Community } from './pages/Community';
 import { AiChat } from './pages/AiChat';
 import { AdminDashboard } from './pages/AdminDashboard';
+import { PersonalInbox } from './pages/PersonalInbox';
 
 import { PWAManager } from './components/PWAManager';
 import { SplashScreen } from './components/SplashScreen';
@@ -156,6 +157,14 @@ function AnimatedRoutes({ toggleTheme, isDarkMode, searchQuery, setSearchQuery, 
             element={
               <PrivateRoute>
                 <PageTransition><Community /></PageTransition>
+              </PrivateRoute>
+            } 
+          />
+          <Route 
+            path="/inbox" 
+            element={
+              <PrivateRoute>
+                <PageTransition><PersonalInbox toggleTheme={toggleTheme} isDarkMode={isDarkMode} /></PageTransition>
               </PrivateRoute>
             } 
           />

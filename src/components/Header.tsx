@@ -1,13 +1,23 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { User, CheckCircle2, Settings, LogOut, Search, Moon, Sun, MonitorSmartphone, ArrowLeft, FileText, Printer, Key, MessageCircle, Clock, X } from 'lucide-react';
+import { User, CheckCircle2, Settings, LogOut, Search, Moon, Sun, MonitorSmartphone, ArrowLeft, FileText, Printer, Key, MessageCircle, Clock, X, Bell } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Note } from '../types';
 import { supabase } from '../supabaseClient';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { ADMIN_EMAIL } from './PrivateRoute';
+import { ADMIN_EMAIL, CO_ADMIN_EMAILS } from './PrivateRoute';
 import { User as AuthUser } from '@supabase/supabase-js';
 import { AppIcon } from './AppIcon';
 import { BrandLogo } from './BrandLogo';
+import { NotificationSettings } from './NotificationSettings';
+
+interface NotificationItem {
+  id: string;
+  message: string;
+  time: string;
+  type: 'notice' | 'message' | 'note';
+  isUnread: boolean;
+  link?: string;
+}
 
 interface HeaderProps {
   toggleTheme: () => void;
@@ -25,9 +35,37 @@ export function Header({ toggleTheme, isDarkMode, searchQuery, setSearchQuery, a
   const [user, setUser] = useState<AuthUser | null>(null);
   const [dbProfile, setDbProfile] = useState<{ username: string; avatar_url: string } | null>(null);
   const [geminiKey, setGeminiKey] = useState('');
+  
+  // Notification State
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [hasUnreadNotifs, setHasUnreadNotifs] = useState(false);
+  const notifContainerRef = useRef<HTMLDivElement>(null);
+  
   const navigate = useNavigate();
   const location = useLocation();
   const searchContainerRef = useRef<HTMLDivElement>(null);
+
+  const fetchNotifications = async (uId: string) => {
+     let notifs: NotificationItem[] = [];
+     
+     // 1. Unread direct messages
+     const { data: msgs } = await supabase.from('direct_messages').select('id, created_at').eq('receiver_id', uId).eq('is_read', false).order('created_at', { ascending: false }).limit(3);
+     if (msgs) {
+        msgs.forEach(m => notifs.push({ id: m.id, message: "You have an unread direct message.", time: m.created_at, type: 'message', isUnread: true, link: '/inbox' }));
+     }
+     
+     // 2. Recent Notes (last 2)
+     const { data: notes } = await supabase.from('notes').select('id, title, created_at').order('created_at', { ascending: false }).limit(2);
+     if (notes) {
+        notes.forEach(n => notifs.push({ id: n.id, message: `New Note Added: ${n.title}`, time: n.created_at, type: 'note', isUnread: false })); // You could track read state for notes, but false is fine
+     }
+     
+     notifs.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
+     setNotifications(notifs);
+     setHasUnreadNotifs(notifs.some(n => n.isUnread));
+  };
 
   useEffect(() => {
     const fetchProfile = async (uId: string) => {
@@ -43,6 +81,7 @@ export function Header({ toggleTheme, isDarkMode, searchQuery, setSearchQuery, a
       setUser(u);
       if (u) {
         fetchProfile(u.id);
+        fetchNotifications(u.id);
       } else {
         setDbProfile(null);
       }
@@ -53,6 +92,7 @@ export function Header({ toggleTheme, isDarkMode, searchQuery, setSearchQuery, a
       setUser(u);
       if (u) {
         fetchProfile(u.id);
+        fetchNotifications(u.id);
       } else {
         setDbProfile(null);
       }
@@ -72,10 +112,20 @@ export function Header({ toggleTheme, isDarkMode, searchQuery, setSearchQuery, a
       console.warn('Failed to parse recent searches', e);
     }
 
+    // Subscribe to direct_messages for realtime bell updates
+    let channel: any;
+    if (user) {
+      channel = supabase.channel('header_notifs')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'direct_messages', filter: `receiver_id=eq.${user.id}` }, () => {
+           fetchNotifications(user.id);
+        }).subscribe();
+    }
+
     return () => {
       subscription.unsubscribe();
+      if (channel) supabase.removeChannel(channel);
     };
-  }, []);
+  }, [user?.id]);
 
   useEffect(() => {
     if (!searchQuery?.trim()) return;
@@ -97,6 +147,9 @@ export function Header({ toggleTheme, isDarkMode, searchQuery, setSearchQuery, a
     const handleClickOutside = (event: MouseEvent) => {
       if (searchContainerRef.current && !searchContainerRef.current.contains(event.target as Node)) {
         setSearchOpen(false);
+      }
+      if (notifContainerRef.current && !notifContainerRef.current.contains(event.target as Node)) {
+        setShowNotifications(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -215,6 +268,66 @@ export function Header({ toggleTheme, isDarkMode, searchQuery, setSearchQuery, a
             <Printer className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
         )}
+        
+        {/* Notification Bell */}
+        {user && (
+          <div className="relative flex items-center" ref={notifContainerRef}>
+             <button
+                onClick={() => setShowNotifications(!showNotifications)}
+                className="p-1.5 sm:p-2 rounded-full hover:bg-theme-muted transition-colors text-theme-text/80 outline-none relative"
+             >
+                <Bell className="w-4 h-4 sm:w-5 sm:h-5" />
+                {hasUnreadNotifs && (
+                   <span className="absolute top-1.5 right-1.5 sm:top-2 sm:right-2 w-2 h-2 rounded-full bg-red-500 border-2 border-theme-bg shadow-sm animate-pulse" />
+                )}
+             </button>
+             
+             {showNotifications && (
+                <div className="absolute top-full mt-2 right-0 w-72 sm:w-80 bg-theme-bg border border-theme-border rounded-2xl shadow-2xl overflow-hidden z-[100] animate-in fade-in slide-in-from-top-1">
+                   <div className="px-4 py-3 border-b border-theme-border flex items-center justify-between bg-theme-muted/30">
+                      <h3 className="font-bold text-sm">Notifications</h3>
+                      <button onClick={() => setShowSettings(true)} className="p-1 hover:bg-theme-border/50 rounded-md transition-colors text-theme-text/60 hover:text-theme-text">
+                         <Settings className="w-4 h-4" />
+                      </button>
+                   </div>
+                   <div className="max-h-80 overflow-y-auto">
+                      {notifications.length === 0 ? (
+                         <div className="p-6 text-center text-theme-text/50 text-xs">No new notifications</div>
+                      ) : (
+                         notifications.map(n => (
+                            <div 
+                               key={n.id} 
+                               onClick={() => {
+                                  if (n.link) {
+                                     navigate(n.link);
+                                     setShowNotifications(false);
+                                  }
+                               }}
+                               className={cn("p-3 border-b border-theme-border/50 hover:bg-theme-muted/50 transition-colors cursor-pointer", n.isUnread ? "bg-theme-muted/30" : "")}
+                            >
+                               <div className="flex items-start gap-2">
+                                  {n.isUnread && <div className="w-1.5 h-1.5 rounded-full bg-theme-accent-end mt-1.5 shrink-0" />}
+                                  <div>
+                                     <p className={cn("text-xs sm:text-sm", n.isUnread ? "font-semibold" : "text-theme-text/80")}>{n.message}</p>
+                                     <p className="text-[10px] text-theme-text/50 mt-0.5">{new Date(n.time).toLocaleString()}</p>
+                                  </div>
+                               </div>
+                            </div>
+                         ))
+                      )}
+                   </div>
+                   {notifications.length > 0 && (
+                      <div className="p-2 border-t border-theme-border bg-theme-muted/20 text-center">
+                         <button onClick={() => setHasUnreadNotifs(false)} className="text-[10px] sm:text-xs font-bold text-theme-accent-end hover:underline">
+                            Mark all as read
+                         </button>
+                      </div>
+                   )}
+                </div>
+             )}
+          </div>
+        )}
+
         <button 
           onClick={toggleTheme} 
           className="p-1.5 sm:p-2 rounded-full hover:bg-theme-muted transition-colors text-theme-text/80 outline-none"
@@ -239,6 +352,8 @@ export function Header({ toggleTheme, isDarkMode, searchQuery, setSearchQuery, a
           </button>
         </div>
       </div>
+      
+      {showSettings && <NotificationSettings user={user} onClose={() => setShowSettings(false)} />}
     </header>
   );
 }
