@@ -109,8 +109,16 @@ export function AiChat({ toggleTheme, isDarkMode }: any) {
   // Gemini State
   const [aiQuery, setAiQuery] = useState('');
   const [isAiLoading, setIsAiLoading] = useState(false);
-  const [localApiKey, setLocalApiKey] = useState(() => localStorage.getItem('user_gemini_api_key') || '');
-  const [showSetupGuide, setShowSetupGuide] = useState(!localApiKey);
+  const [localApiKey, setLocalApiKey] = useState('');
+  const [showSetupGuide, setShowSetupGuide] = useState(true);
+
+  useEffect(() => {
+    const key = localStorage.getItem('user_gemini_api_key');
+    if (key) {
+      setLocalApiKey(key);
+      setShowSetupGuide(false);
+    }
+  }, []);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -213,17 +221,32 @@ export function AiChat({ toggleTheme, isDarkMode }: any) {
       
       let contextText = "";
 
-      const currentMsgs = sessions.find(s => s.id === activeId)?.messages || [];
-      if (attachedNoteIds.size > 0 && currentMsgs.length <= 2) {
+      const activeSession = sessions.find(s => s.id === activeId) || { messages: [] };
+      const currentMsgs = activeSession.messages;
+      const isFirstMessage = currentMsgs.length === 0; // Only user's first query before state updates
+      
+      if (attachedNoteIds.size > 0 && isFirstMessage) {
         const idsArray = Array.from(attachedNoteIds);
-        const { data: attachedNotesData } = await supabase.from('notes').select('title, html_code').in('id', idsArray);
-        if (attachedNotesData) {
-           contextText = attachedNotesData.map(n => `--- Module: ${n.title} ---\n${extractPlainText(n.html_code || '')}`).join('\n\n');
+        const { data: attachedNotesData, error: notesError } = await supabase.from('notes').select('title, html_code, description').in('id', idsArray);
+        if (notesError) {
+          console.error("Error fetching attached notes:", notesError);
+        }
+        if (attachedNotesData && attachedNotesData.length > 0) {
+           contextText = attachedNotesData.map(n => {
+              const textContent = n.html_code ? extractPlainText(n.html_code) : (n.description || "No text available.");
+              if (!textContent.trim()) {
+                 console.warn(`Warning: Note "${n.title}" has empty text content.`);
+              }
+              return `--- Module: ${n.title} ---\n${textContent}`;
+           }).join('\n\n');
+        } else {
+           console.warn("Warning: Attached notes not found or empty.");
         }
       }
 
       const systemInstruction = `You are an expert AI tutor. Use the provided context to answer the user's question perfectly in Bengali. DO NOT mention HTML.`;
 
+      // Build history excluding the very last empty model message
       const historyToPass = currentMsgs.filter(m => m.content !== '').map(m => ({
         role: m.role,
         parts: [{ text: m.content }]

@@ -241,7 +241,8 @@ export function Community() {
   const subscriptionRef = useRef<any>(null);
   const controlsSubscriptionRef = useRef<any>(null);
 
-  const isSuperAdmin = user?.email === 'sadishekh671@gmail.com';
+  const CO_ADMIN_EMAILS = ['moderator@example.com', 'coadmin@example.com'];
+  const isSuperAdmin = user?.email === 'sadishekh671@gmail.com' || (user?.email && CO_ADMIN_EMAILS.includes(user.email));
   const isAdmin = isSuperAdmin || profile?.is_admin === true;
 
   useEffect(() => {

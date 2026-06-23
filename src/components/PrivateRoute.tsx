@@ -4,6 +4,7 @@ import { supabase } from '../supabaseClient';
 import { User } from '@supabase/supabase-js';
 
 export const ADMIN_EMAIL = 'sadishekh671@gmail.com';
+export const CO_ADMIN_EMAILS = ['moderator@example.com', 'coadmin@example.com'];
 
 interface PrivateRouteProps {
   children: React.ReactNode;
@@ -23,7 +24,7 @@ export function PrivateRoute({ children, adminOnly = false }: PrivateRouteProps)
       setUser(currentUser);
 
       if (currentUser) {
-        if (currentUser.email === ADMIN_EMAIL) {
+        if (currentUser.email && (currentUser.email === ADMIN_EMAIL || CO_ADMIN_EMAILS.includes(currentUser.email))) {
           setIsAdmin(true);
         } else {
           // Check profile for is_admin

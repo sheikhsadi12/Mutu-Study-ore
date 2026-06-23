@@ -50,7 +50,8 @@ export function Comments({ noteId }: { noteId: string }) {
   const controlsSubscriptionRef = useRef<any>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const isSuperAdmin = user?.email === 'sadishekh671@gmail.com';
+  const CO_ADMIN_EMAILS = ['moderator@example.com', 'coadmin@example.com'];
+  const isSuperAdmin = user?.email === 'sadishekh671@gmail.com' || (user?.email && CO_ADMIN_EMAILS.includes(user.email));
   const isAdmin = isSuperAdmin || profile?.is_admin === true;
 
   useEffect(() => {
