@@ -194,7 +194,7 @@ export function NoteView({ note, onBack, isDarkMode = false }: NoteViewProps) {
                 title="Google Drive PDF Reader"
               ></iframe>
             </div>
-          ) : !fullNote?.html_code ? (
+          ) : fullNote?.html_code === null || fullNote?.html_code === undefined ? (
             <div className="flex items-center justify-center min-h-[50vh] opacity-50 font-sans">
               Loading material...
             </div>

@@ -1,68 +1,13 @@
-const CACHE_NAME = 'mutu-study-v2';
-const ASSETS_TO_CACHE = [
-  '/',
-  '/index.html',
-  '/manifest.json',
-  '/icon.svg'
-];
-
-self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS_TO_CACHE);
-    })
-  );
+self.addEventListener('install', function(e) {
   self.skipWaiting();
 });
 
-self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cache) => {
-          if (cache !== CACHE_NAME) {
-            return caches.delete(cache);
-          }
-        })
-      );
+self.addEventListener('activate', function(e) {
+  self.registration.unregister()
+    .then(function() {
+      return self.clients.matchAll();
     })
-  );
-  self.clients.claim();
-});
-
-self.addEventListener('fetch', (event) => {
-  // Ignore non-HTTP(S) protocols (like ws://, chrome-extension://)
-  if (!event.request.url.startsWith('http')) return;
-
-  // Ignore Vite HMR & Dev paths
-  if (
-    event.request.url.includes('/@vite/') ||
-    event.request.url.includes('/@react-refresh') ||
-    event.request.url.includes('node_modules') ||
-    event.request.url.includes('?import')
-  ) {
-    return;
-  }
-
-  // Network-first strategy for a dynamic React app
-  // This ensures the app can still work offline while aggressively fetching the latest if online
-  if (event.request.method !== 'GET') return;
-
-  event.respondWith(
-    fetch(event.request)
-      .then((response) => {
-        // Cache the latest version
-        if (response && response.status === 200 && response.type === 'basic') {
-          const responseToCache = response.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseToCache);
-          });
-        }
-        return response;
-      })
-      .catch(() => {
-        // If network fails, return cached response
-        return caches.match(event.request);
-      })
-  );
+    .then(function(clients) {
+      clients.forEach(client => client.navigate(client.url))
+    });
 });

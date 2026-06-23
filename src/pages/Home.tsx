@@ -67,8 +67,8 @@ export function Home({ toggleTheme, isDarkMode, searchQuery, setSearchQuery }: a
     if (n.subject === 'SYSTEM_CONFIG') return false;
     const matchesSubject = filter === 'All' || n.subject === filter;
     const searchMatch = searchQuery === '' || 
-      n.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-      n.description.toLowerCase().includes(searchQuery.toLowerCase());
+      (n.title && n.title.toLowerCase().includes(searchQuery.toLowerCase())) || 
+      (n.description && n.description.toLowerCase().includes(searchQuery.toLowerCase()));
     return matchesSubject && searchMatch;
   });
 
