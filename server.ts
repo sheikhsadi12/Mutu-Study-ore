@@ -2,7 +2,6 @@ import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { triggerDailyExamNotifications } from "./src/lib/examNotifier.js";
 
 async function startServer() {
   const app = express();
@@ -42,26 +41,6 @@ async function startServer() {
 
     } catch (error: any) {
       console.error("Gemini proxy error:", error);
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  // API route to trigger daily exam notifications (can be called by a cron job)
-  app.post("/api/trigger-exam-notifications", async (req, res) => {
-    try {
-      // Optional: Add a simple secret key check here to prevent unauthorized triggering
-      // if (req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {
-      //   return res.status(401).json({ error: "Unauthorized" });
-      // }
-
-      const result = await triggerDailyExamNotifications();
-      if (result.success) {
-        res.status(200).json(result);
-      } else {
-        res.status(500).json(result);
-      }
-    } catch (error: any) {
-      console.error("Exam notification cron error:", error);
       res.status(500).json({ error: error.message });
     }
   });
