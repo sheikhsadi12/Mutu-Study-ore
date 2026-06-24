@@ -109,13 +109,13 @@ export function AiChat({ toggleTheme, isDarkMode }: any) {
   // Gemini State
   const [aiQuery, setAiQuery] = useState('');
   const [isAiLoading, setIsAiLoading] = useState(false);
-  const [localApiKey, setLocalApiKey] = useState('');
+  const [apiKey, setApiKey] = useState('');
   const [showSetupGuide, setShowSetupGuide] = useState(true);
 
   useEffect(() => {
-    const key = localStorage.getItem('user_gemini_api_key');
-    if (key) {
-      setLocalApiKey(key);
+    const savedKey = localStorage.getItem('gemini_api_key');
+    if (savedKey) {
+      setApiKey(savedKey);
       setShowSetupGuide(false);
     }
   }, []);
@@ -148,14 +148,14 @@ export function AiChat({ toggleTheme, isDarkMode }: any) {
 
   const saveApiKey = (key: string) => {
     if (!key.trim()) return;
-    setLocalApiKey(key);
-    localStorage.setItem('user_gemini_api_key', key);
+    setApiKey(key);
+    localStorage.setItem('gemini_api_key', key);
     setShowSetupGuide(false);
   };
 
   const resetApiKey = () => {
-    setLocalApiKey('');
-    localStorage.removeItem('user_gemini_api_key');
+    setApiKey('');
+    localStorage.removeItem('gemini_api_key');
     setShowSetupGuide(true);
   };
 
@@ -182,7 +182,7 @@ export function AiChat({ toggleTheme, isDarkMode }: any) {
   const handleAiSubmit = async () => {
     if (!aiQuery.trim() || isAiLoading) return;
 
-    const userKey = localStorage.getItem('user_gemini_api_key');
+    const userKey = localStorage.getItem('gemini_api_key');
     if (!userKey) {
       setShowSetupGuide(true);
       return;
@@ -533,8 +533,8 @@ export function AiChat({ toggleTheme, isDarkMode }: any) {
                  <p><span className="font-bold text-theme-accent-start">৩.</span> কী-টি কপি করে নিচের বক্সে পেস্ট করে সেভ করুন।</p>
                </div>
                <div className="space-y-4">
-                 <input type="password" placeholder="Paste your API Key here..." value={localApiKey} onChange={(e) => setLocalApiKey(e.target.value)} className="w-full bg-theme-bg border border-theme-border/80 rounded-xl px-4 py-3.5 outline-none focus:border-theme-accent-end transition-all shadow-inner text-[15px]" />
-                 <button onClick={() => saveApiKey(localApiKey)} className="w-full bg-gradient-to-r from-theme-accent-start to-theme-accent-end text-white font-bold py-3.5 px-4 rounded-xl shadow-md transition-all flex items-center justify-center gap-2 text-[15px]"><CheckCircle2 className="w-5 h-5" /> Save Key</button>
+                 <input type="password" placeholder="Paste your API Key here..." value={apiKey} onChange={(e) => setApiKey(e.target.value)} className="w-full bg-theme-bg border border-theme-border/80 rounded-xl px-4 py-3.5 outline-none focus:border-theme-accent-end transition-all shadow-inner text-[15px]" />
+                 <button onClick={() => saveApiKey(apiKey)} className="w-full bg-gradient-to-r from-theme-accent-start to-theme-accent-end text-white font-bold py-3.5 px-4 rounded-xl shadow-md transition-all flex items-center justify-center gap-2 text-[15px]"><CheckCircle2 className="w-5 h-5" /> Save Key</button>
                </div>
             </div>
           </div>
