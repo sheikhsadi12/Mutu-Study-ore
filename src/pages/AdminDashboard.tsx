@@ -8,6 +8,7 @@ interface AdminUser {
   email: string;
   full_name?: string;
   avatar_url?: string;
+  username?: string;
   is_banned: boolean;
   is_admin: boolean;
   created_at?: string;
@@ -26,6 +27,7 @@ export function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [systemControls, setSystemControls] = useState<SystemControls>({
     id: 1,
     is_login_disabled: false,
@@ -41,29 +43,46 @@ export function AdminDashboard() {
   const [savingConfig, setSavingConfig] = useState(false);
   const [loadingConfig, setLoadingConfig] = useState(true);
 
+  // Debounce search term
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Fetch users based on search
   useEffect(() => {
     let isMounted = true;
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (isMounted) {
-        setCurrentUserEmail(session?.user?.email || null);
-      }
-    });
-
-    const loadInitialData = async () => {
+    const fetchFilteredUsers = async () => {
       setLoading(true);
       setError(null);
       try {
-        const { data: profiles, error: profilesError } = await supabase
+        let query = supabase
           .from('profiles')
-          .select('id, email, full_name, avatar_url, created_at, is_admin, is_banned')
+          .select('id, email, full_name, avatar_url, created_at, is_admin, is_banned, username')
           .order('created_at', { ascending: false });
 
-        if (profilesError) {
-          throw profilesError;
+        if (debouncedSearchTerm.trim()) {
+           const term = debouncedSearchTerm.trim();
+           // Supabase crashes if we pass a non-UUID to an ID column
+           const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(term);
+           
+           if (isUuid) {
+              query = query.or(`id.eq.${term},email.ilike.%${term}%,full_name.ilike.%${term}%,username.ilike.%${term}%`);
+           } else {
+              query = query.or(`email.ilike.%${term}%,full_name.ilike.%${term}%,username.ilike.%${term}%`);
+           }
+        } else {
+           query = query.limit(10000); // Load latest 10000 to see full extent of members
         }
 
-        if (profiles && profiles.length > 0) {
+        const { data: profiles, error: profilesError } = await query;
+
+        if (profilesError) throw profilesError;
+
+        if (profiles && isMounted) {
           const mapped: AdminUser[] = profiles.map((p) => ({
             id: p.id,
             email: p.email || '',
@@ -72,11 +91,11 @@ export function AdminDashboard() {
             is_banned: p.is_banned || false,
             is_admin: p.is_admin || false,
             created_at: p.created_at || undefined,
+            username: p.username,
           }));
-
-          if (isMounted) setUsers(mapped);
-        } else {
-          if (isMounted) setUsers([]);
+          setUsers(mapped);
+        } else if (isMounted) {
+          setUsers([]);
         }
       } catch (e: any) {
         console.error('Supabase Fetch Error:', e.message);
@@ -85,6 +104,29 @@ export function AdminDashboard() {
         if (isMounted) setLoading(false);
       }
     };
+
+    fetchFilteredUsers();
+
+    const channel = supabase.channel('profiles-admin-updates')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
+         fetchFilteredUsers();
+      })
+      .subscribe();
+
+    return () => {
+      isMounted = false;
+      supabase.removeChannel(channel);
+    };
+  }, [debouncedSearchTerm]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (isMounted) {
+        setCurrentUserEmail(session?.user?.email || null);
+      }
+    });
 
     const loadSystemControls = async () => {
       try {
@@ -131,7 +173,6 @@ export function AdminDashboard() {
       }
     };
 
-    loadInitialData();
     loadSystemControls();
     loadDashboardConfig();
 
@@ -240,45 +281,6 @@ export function AdminDashboard() {
     }
   };
 
-  const fetchUsers = async () => {
-    setLoading(true);
-    try {
-      const { data: profiles, error: profilesError } = await supabase
-        .from('profiles')
-        .select('*');
-
-      if (profilesError) throw profilesError;
-
-      if (profiles && profiles.length > 0) {
-        const mapped: AdminUser[] = profiles.map((p) => ({
-          id: p.id,
-          email: p.email || '',
-          full_name: p.full_name,
-          avatar_url: p.avatar_url,
-          is_banned: p.is_banned || false,
-          is_admin: p.is_admin || false,
-          created_at: p.created_at || undefined,
-        }));
-
-        mapped.sort((a, b) => {
-           if (a.created_at && b.created_at) {
-              return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-           }
-           return 0;
-        });
-
-        setUsers(mapped);
-      } else {
-        setUsers([]);
-      }
-    } catch (e: any) {
-      console.error('Error fetching admin dashboard users:', e);
-      alert('Failed to load user list.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleToggleAdmin = async (userId: string, currentlyAdmin: boolean) => {
     if (!window.confirm(`Are you sure you want to ${currentlyAdmin ? 'remove' : 'make'} this user an admin?`)) return;
 
@@ -364,11 +366,6 @@ export function AdminDashboard() {
       setSavingConfig(false);
     }
   };
-
-  const filteredUsers = users.filter(u => 
-      u.email?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      u.full_name?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
 
   return (
     <div className="min-h-screen bg-theme-bg font-sans font-medium">
@@ -582,14 +579,14 @@ export function AdminDashboard() {
                          </div>
                       </td>
                    </tr>
-                ) : filteredUsers.length === 0 ? (
+                ) : users.length === 0 ? (
                    <tr>
                       <td colSpan={currentUserEmail === 'sadishekh671@gmail.com' ? 6 : 5} className="p-8 text-center text-theme-text/50">
                         No users found in the database.
                       </td>
                    </tr>
                 ) : (
-                  filteredUsers.map((user) => (
+                  users.map((user) => (
                     <tr key={user.id} className="border-b last:border-b-0 border-theme-border hover:bg-theme-muted/10 transition-colors">
                       <td className="p-4">
                         <div className="flex items-center gap-3">
@@ -601,6 +598,7 @@ export function AdminDashboard() {
                           <div>
                             <div className="font-bold text-theme-text">{user.full_name || 'Unknown Student'}</div>
                             <div className="text-sm text-theme-text/70">{user.email || 'N/A'}</div>
+                            {user.username && <div className="text-xs text-blue-500 font-medium">@{user.username}</div>}
                           </div>
                         </div>
                       </td>

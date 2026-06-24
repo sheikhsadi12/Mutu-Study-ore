@@ -220,14 +220,28 @@ export default function App() {
     const syncUserToAdminDb = async (session: any) => {
        if (!session?.user) return;
        try {
-           const { data: profile } = await supabase.from('profiles').select('username').eq('id', session.user.id).maybeSingle();
+           const { data: profile } = await supabase.from('profiles').select('username, avatar_url, full_name').eq('id', session.user.id).maybeSingle();
            const username = profile?.username || session.user.user_metadata?.username || 'New User';
+           const full_name = session.user.user_metadata?.full_name || profile?.full_name || '';
+           const avatar_url = session.user.user_metadata?.avatar_url || profile?.avatar_url || '';
+
+           // Upsert to profiles
+           await supabase.from('profiles').upsert({
+              id: session.user.id,
+              email: session.user.email || '',
+              username: username,
+              full_name: full_name,
+              avatar_url: avatar_url,
+              created_at: session.user.created_at || new Date().toISOString()
+           }, { onConflict: 'id' });
+
+           // Upsert to admin_user_list for legacy compatibility
            await supabase.from('admin_user_list').upsert({
               id: session.user.id,
               email: session.user.email || '',
               username: username,
               created_at: session.user.created_at || new Date().toISOString()
-           });
+           }, { onConflict: 'id' });
        } catch(err) {
            console.error("Global silent sync error:", err);
        }
