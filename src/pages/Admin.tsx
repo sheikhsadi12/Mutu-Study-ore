@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Upload, Lock, Code, List, MessageSquare, Edit, Trash2, BookOpen } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { ArrowLeft, Upload, Lock, Code, List, MessageSquare, Edit, Trash2, BookOpen, ChevronDown } from 'lucide-react';
 import { Note, Comment } from '../types';
 import { supabase } from '../supabaseClient';
 import { useNavigate } from 'react-router-dom';
@@ -24,9 +24,38 @@ export function Admin({ onBack }: AdminProps) {
   // Form State
   const [editNoteId, setEditNoteId] = useState<string | null>(null);
   const [title, setTitle] = useState('');
+  const [commonTag, setCommonTag] = useState(() => {
+    try { return localStorage.getItem('current_common_tag') || ''; } catch { return ''; }
+  });
+  const [savedTags, setSavedTags] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem('saved_common_tags') || '[]'); } catch { return []; }
+  });
+  const [savedDescTemplates, setSavedDescTemplates] = useState<{name: string, content: string}[]>(() => {
+    try { return JSON.parse(localStorage.getItem('saved_desc_templates') || '[]'); } catch { return []; }
+  });
+  const [selectedTemplateName, setSelectedTemplateName] = useState('');
   const [subject, setSubject] = useState('');
+  const [isCreatingNewSubject, setIsCreatingNewSubject] = useState(false);
+  const [isSubjectDropdownOpen, setIsSubjectDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsSubjectDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+  const [existingSubjects, setExistingSubjects] = useState<string[]>([]);
   const [type, setType] = useState<'STATIC_A4' | 'DYNAMIC_APPLET'>('STATIC_A4');
-  const [description, setDescription] = useState('');
+  const [description, setDescription] = useState(() => {
+    try { return localStorage.getItem('current_description') || ''; } catch { return ''; }
+  });
   const [rawHtmlText, setRawHtmlText] = useState('');
   const [pdf_url, setPdf_url] = useState('');
 
@@ -40,11 +69,37 @@ export function Admin({ onBack }: AdminProps) {
     }
   }, [isAuthenticated]);
 
+  useEffect(() => {
+    try {
+      localStorage.setItem('current_common_tag', commonTag);
+    } catch (e) {
+      console.error('Failed to save current common tag', e);
+    }
+  }, [commonTag]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('current_description', description);
+    } catch (e) {
+      console.error('Failed to save current description', e);
+    }
+  }, [description]);
+
   const fetchData = async () => {
     // Fetch Notes from Supabase
-    const { data: notesData, error } = await supabase.from('notes').select('*').order('created_at', { ascending: false });
-    if (notesData && !error) {
-       setLocalNotes(notesData as Note[]);
+    try {
+      const { data: notesData, error } = await supabase.from('notes').select('*').order('created_at', { ascending: false });
+      if (error) {
+         console.error("Supabase Error Fetching Notes:", error);
+         setExistingSubjects([]);
+      } else if (notesData) {
+         setLocalNotes(notesData as Note[]);
+         const uniqueSubjects = Array.from(new Set(notesData.map((note: any) => note.subject).filter(Boolean))) as string[];
+         setExistingSubjects(uniqueSubjects);
+      }
+    } catch (err) {
+      console.error("Failed to fetch subjects:", err);
+      setExistingSubjects([]);
     }
 
     // Fetch Comments securely (currently local fallback for comments if supabase doesn't have it defined, wait let me keep it as localStorage for comments unless told otherwise. Actually let's assume comments are still local, the user didn't mention moving comments).
@@ -97,9 +152,11 @@ export function Admin({ onBack }: AdminProps) {
         return;
       }
 
+      const finalTitle = editNoteId ? title : `${title.trim()} ${commonTag.trim()}`.trim();
+
       const payload = {
         subject: subject,
-        title: title,
+        title: finalTitle,
         type: type,
         description: description,
         html_code: rawHtmlText,
@@ -148,14 +205,23 @@ export function Admin({ onBack }: AdminProps) {
       
       await fetchData();
       
-      // Reset Form
-      setEditNoteId(null);
-      setTitle('');
-      setDescription('');
-      setSubject('');
-      setRawHtmlText('');
-      setPdf_url('');
-      setActiveTab('manage');
+      // Reset Form for batch upload (keep common tag and description)
+      if (editNoteId) {
+        setEditNoteId(null);
+        setTitle('');
+        setDescription('');
+        setSubject('');
+        setIsCreatingNewSubject(false);
+        setRawHtmlText('');
+        setPdf_url('');
+        setActiveTab('manage');
+      } else {
+        // Batch upload behavior
+        setTitle('');
+        setRawHtmlText('');
+        setPdf_url('');
+        // We do NOT reset description or commonTag or subject to speed up batch processing
+      }
     } catch (error: any) {
       console.warn("Storage exception handling:", error);
       alert("Error saving material to Supabase: " + (error.message || 'Unknown error.'));
@@ -166,6 +232,7 @@ export function Admin({ onBack }: AdminProps) {
     setEditNoteId(note.id);
     setTitle(note.title);
     setSubject(note.subject);
+    setIsCreatingNewSubject(false);
     setType(note.type);
     setDescription(note.description);
     setRawHtmlText(note.html_code);
@@ -299,6 +366,8 @@ export function Admin({ onBack }: AdminProps) {
                         setEditNoteId(null);
                         setTitle('');
                         setDescription('');
+                        setSubject('');
+                        setIsCreatingNewSubject(false);
                         setRawHtmlText('');
                     }} className="ml-auto text-[10px] uppercase font-bold text-theme-text/50 hover:text-theme-accent-end">
                         Cancel Edit
@@ -308,13 +377,87 @@ export function Admin({ onBack }: AdminProps) {
                 
                 <form onSubmit={handleUploadSubmit} className="flex flex-col gap-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] md:text-xs font-bold text-theme-text/70 uppercase">Title *</label>
-                    <input required type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Carnot Cycle Final Notes" className="px-3 py-2 bg-theme-bg border border-theme-border rounded-md text-xs md:text-sm focus:border-theme-accent-end outline-none shadow-sm" />
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] md:text-xs font-bold text-theme-text/70 uppercase">Topic Name *</label>
+                        <input required type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Carnot Cycle" className="px-3 py-2 bg-theme-bg border border-theme-border rounded-md text-xs md:text-sm focus:border-theme-accent-end outline-none shadow-sm w-full" />
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] md:text-xs font-bold text-theme-text/70 uppercase">Common Tag</label>
+                        <input type="text" list="saved-tags-list" value={commonTag} onChange={(e) => setCommonTag(e.target.value)} onBlur={(e) => {
+                          const val = e.target.value.trim();
+                          if (val && !savedTags.includes(val)) {
+                            const newTags = [...savedTags, val];
+                            setSavedTags(newTags);
+                            localStorage.setItem('saved_common_tags', JSON.stringify(newTags));
+                          }
+                        }} placeholder="e.g. [Part 1]" className="px-3 py-2 bg-theme-bg border border-theme-border rounded-md text-xs md:text-sm focus:border-theme-accent-end outline-none shadow-sm w-full" />
+                        <datalist id="saved-tags-list">
+                          {savedTags.map(t => <option key={t} value={t} />)}
+                        </datalist>
+                      </div>
                     </div>
                     <div className="flex flex-col gap-1.5">
                     <label className="text-[10px] md:text-xs font-bold text-theme-text/70 uppercase">Subject *</label>
-                    <input required type="text" value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="e.g. Physics, Mathematics, History..." className="px-3 py-2 bg-theme-bg border border-theme-border rounded-md text-xs md:text-sm focus:border-theme-accent-end outline-none shadow-sm" />
+                    {isCreatingNewSubject || existingSubjects.length === 0 ? (
+                      <div className="flex items-center gap-2">
+                        <input required type="text" value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Type new subject..." className="px-3 py-2 bg-theme-bg border border-theme-border rounded-md text-xs md:text-sm focus:border-theme-accent-end outline-none shadow-sm flex-1" />
+                        {existingSubjects.length > 0 && (
+                           <button type="button" onClick={() => { setIsCreatingNewSubject(false); setSubject(existingSubjects[0] || ''); }} className="px-3 py-2 text-theme-text/60 hover:text-red-500 transition-colors bg-theme-muted/30 border border-theme-border rounded-md text-xs md:text-sm font-bold" title="Cancel New Subject">X</button>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="relative" ref={dropdownRef}>
+                        <button
+                          type="button"
+                          onClick={() => setIsSubjectDropdownOpen(!isSubjectDropdownOpen)}
+                          className="w-full flex items-center justify-between px-3 py-2 bg-[#2d1b1b] border border-[#523232] rounded-md text-xs md:text-sm text-[#e6d5c3] focus:border-[#d4af37] focus:ring-1 focus:ring-[#d4af37] outline-none shadow-sm transition-all text-left"
+                        >
+                          <span className={subject ? "text-[#e6d5c3]" : "text-[#e6d5c3]/50"}>
+                            {subject || "Select a subject..."}
+                          </span>
+                          <ChevronDown className="w-4 h-4 text-[#d4af37]" />
+                        </button>
+                        
+                        {isSubjectDropdownOpen && (
+                          <div className="absolute z-10 mt-1 w-full bg-[#2d1b1b] border border-[#523232] rounded-md shadow-lg overflow-hidden flex flex-col">
+                            <ul className="max-h-60 overflow-y-auto">
+                              {existingSubjects.map(sub => (
+                                <li key={sub}>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setSubject(sub);
+                                      setIsSubjectDropdownOpen(false);
+                                    }}
+                                    className={`w-full text-left px-3 py-2 text-xs md:text-sm transition-colors ${
+                                      subject === sub 
+                                        ? "bg-[#523232] text-[#d4af37] font-semibold" 
+                                        : "text-[#e6d5c3] hover:bg-[#3b2323]"
+                                    }`}
+                                  >
+                                    {sub}
+                                  </button>
+                                </li>
+                              ))}
+                            </ul>
+                            <div className="border-t border-[#523232] bg-[#3b2323]">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setIsCreatingNewSubject(true);
+                                    setSubject('');
+                                    setIsSubjectDropdownOpen(false);
+                                  }}
+                                  className="w-full text-left px-3 py-2.5 text-xs md:text-sm font-bold text-[#d4af37] hover:bg-[#523232] transition-colors flex items-center gap-2"
+                                >
+                                  <span>➕</span> Create New Subject...
+                                </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
                     </div>
                 </div>
 
@@ -327,7 +470,42 @@ export function Admin({ onBack }: AdminProps) {
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] md:text-xs font-bold text-theme-text/70 uppercase">Description</label>
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] md:text-xs font-bold text-theme-text/70 uppercase">Description</label>
+                      <div className="flex items-center gap-2">
+                        <select 
+                           value={selectedTemplateName}
+                           onChange={(e) => {
+                             const tmpl = savedDescTemplates.find(t => t.name === e.target.value);
+                             setSelectedTemplateName(e.target.value);
+                             if (tmpl) setDescription(tmpl.content);
+                           }}
+                           className="px-2 py-1 bg-[#2d1b1b] border border-[#523232] rounded text-[10px] md:text-xs text-[#e6d5c3] outline-none max-w-[150px]"
+                        >
+                           <option value="">Select Template...</option>
+                           {savedDescTemplates.map(t => (
+                              <option key={t.name} value={t.name}>{t.name}</option>
+                           ))}
+                        </select>
+                        <button 
+                          type="button"
+                          onClick={() => {
+                             if (!description.trim()) { alert("Please write a description first."); return; }
+                             const name = prompt("Enter a name for this template:");
+                             if (name) {
+                               const newTemplates = [...savedDescTemplates.filter(t => t.name !== name), { name, content: description }];
+                               setSavedDescTemplates(newTemplates);
+                               localStorage.setItem('saved_desc_templates', JSON.stringify(newTemplates));
+                               setSelectedTemplateName(name);
+                             }
+                          }}
+                          className="px-2 py-1 bg-[#3b2323] hover:bg-[#523232] text-[#d4af37] border border-[#523232] rounded text-[10px] md:text-xs font-bold transition-colors"
+                          title="Save as new template"
+                        >
+                          💾 Save
+                        </button>
+                      </div>
+                    </div>
                     <textarea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Brief summary of the contents..." className="px-3 py-2 bg-theme-bg border border-theme-border rounded-md text-xs md:text-sm focus:border-theme-accent-end outline-none shadow-sm font-arabic" />
                 </div>
 
