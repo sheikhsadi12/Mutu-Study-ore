@@ -6,6 +6,7 @@ import { Note } from '../types';
 import { FileText, LayoutGrid, Clock, BookOpen, Crown } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { supabase } from '../supabaseClient';
+import { WhatsAppBanner } from '../components/WhatsAppVIPInvite';
 
 export function EliteSuggestions({ toggleTheme, isDarkMode, searchQuery, setSearchQuery }: any) {
   const navigate = useNavigate();
@@ -70,6 +71,10 @@ export function EliteSuggestions({ toggleTheme, isDarkMode, searchQuery, setSear
           <p className="text-[#dcd0c0]/80 font-medium text-xs md:text-sm max-w-lg">
             Exclusive, high-priority last night suggestions specially curated for the Alim 2026 batch.
           </p>
+        </div>
+
+        <div className="mb-6">
+          <WhatsAppBanner />
         </div>
 
         {isLoading ? (
