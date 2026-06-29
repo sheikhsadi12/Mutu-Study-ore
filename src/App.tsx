@@ -18,6 +18,7 @@ import { MessageCircle, Bot } from 'lucide-react';
 import { Profile } from './pages/Profile';
 import { Community } from './pages/Community';
 import { AiChat } from './pages/AiChat';
+import { EliteSuggestions } from './pages/EliteSuggestions';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { PersonalInbox } from './pages/PersonalInbox';
 
@@ -106,6 +107,21 @@ function AnimatedRoutes({ toggleTheme, isDarkMode, searchQuery, setSearchQuery, 
               <PrivateRoute>
                 <PageTransition>
                   <Home 
+                    toggleTheme={toggleTheme} 
+                    isDarkMode={isDarkMode}
+                    searchQuery={searchQuery}
+                    setSearchQuery={setSearchQuery}
+                  />
+                </PageTransition>
+              </PrivateRoute>
+            } 
+          />
+          <Route 
+            path="/elite-suggestions" 
+            element={
+              <PrivateRoute>
+                <PageTransition>
+                  <EliteSuggestions 
                     toggleTheme={toggleTheme} 
                     isDarkMode={isDarkMode}
                     searchQuery={searchQuery}

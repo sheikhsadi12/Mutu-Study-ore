@@ -64,7 +64,7 @@ export function Home({ toggleTheme, isDarkMode, searchQuery, setSearchQuery }: a
   }, []);
 
   const filteredNotes = notes.filter((n: Note) => {
-    if (n.subject === 'SYSTEM_CONFIG') return false;
+    if (n.subject === 'SYSTEM_CONFIG' || n.subject?.startsWith('[ELITE]')) return false;
     const matchesSubject = filter === 'All' || n.subject === filter;
     const searchMatch = searchQuery === '' || 
       (n.title && n.title.toLowerCase().includes(searchQuery.toLowerCase())) || 
@@ -72,7 +72,7 @@ export function Home({ toggleTheme, isDarkMode, searchQuery, setSearchQuery }: a
     return matchesSubject && searchMatch;
   });
 
-  const subjects = ['All', ...Array.from(new Set(notes.map((n: Note) => n.subject)))];
+  const subjects = ['All', ...Array.from(new Set(notes.filter((n: Note) => n.subject && n.subject !== 'SYSTEM_CONFIG' && !n.subject.startsWith('[ELITE]')).map((n: Note) => n.subject)))];
 
   // Directory UI component shared for Mobile View and Desktop Left Panel
   const DirectoryView = ({ condensed = false }: { condensed?: boolean }) => (

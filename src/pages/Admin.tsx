@@ -56,6 +56,7 @@ export function Admin({ onBack }: AdminProps) {
   const [description, setDescription] = useState(() => {
     try { return localStorage.getItem('current_description') || ''; } catch { return ''; }
   });
+  const [isEliteSuggestion, setIsEliteSuggestion] = useState(false);
   const [rawHtmlText, setRawHtmlText] = useState('');
   const [pdf_url, setPdf_url] = useState('');
 
@@ -154,8 +155,11 @@ export function Admin({ onBack }: AdminProps) {
 
       const finalTitle = editNoteId ? title : `${title.trim()} ${commonTag.trim()}`.trim();
 
+      const isElite = isEliteSuggestion && !editNoteId;
+      const finalSubject = isElite ? `[ELITE] ${subject}` : subject;
+
       const payload = {
-        subject: subject,
+        subject: finalSubject,
         title: finalTitle,
         type: type,
         description: description,
@@ -376,6 +380,20 @@ export function Admin({ onBack }: AdminProps) {
                 </div>
                 
                 <form onSubmit={handleUploadSubmit} className="flex flex-col gap-4">
+                {!editNoteId && (
+                  <div className="flex items-center gap-2 mb-2 p-3 bg-gradient-to-r from-[#2d1136]/10 to-[#1a0524]/10 border border-[#d4af37]/30 rounded-md">
+                    <input 
+                      type="checkbox" 
+                      id="isEliteSuggestion" 
+                      checked={isEliteSuggestion} 
+                      onChange={(e) => setIsEliteSuggestion(e.target.checked)}
+                      className="w-4 h-4 accent-[#d4af37]"
+                    />
+                    <label htmlFor="isEliteSuggestion" className="text-xs md:text-sm font-bold text-[#d4af37] cursor-pointer">
+                      Publish as "Elite Suggestion" (Dashboard Banner)
+                    </label>
+                  </div>
+                )}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="grid grid-cols-2 gap-2">
                       <div className="flex flex-col gap-1.5">

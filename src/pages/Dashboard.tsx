@@ -15,6 +15,7 @@ import {
   BookOpen
 } from 'lucide-react';
 import { Header } from '../components/Header';
+import { EliteSuggestionBanner } from '../components/EliteSuggestionBanner';
 import { supabase } from '../supabaseClient';
 
 interface DashboardProps {
@@ -172,7 +173,7 @@ export function Dashboard({ toggleTheme, isDarkMode, searchQuery, setSearchQuery
         </div>
 
         {/* Compact Countdown Section (Adapts to Light/Dark Modes with Royal Maroon Themes) */}
-        <section className="w-full max-w-md mx-auto relative group">
+        <section className="w-full max-w-2xl mx-auto relative group">
           {/* Custom style injection for premium animated glass-shine effects */}
           <style dangerouslySetInnerHTML={{__html: `
             @keyframes glass-shine-animation {
@@ -319,6 +320,18 @@ export function Dashboard({ toggleTheme, isDarkMode, searchQuery, setSearchQuery
               <span>নির্ধারিত তারিখ: {new Date(countdownDate).toLocaleDateString('bn-BD', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
             </div>
           </div>
+        </section>
+
+        {/* Elite Suggestion Section */}
+        <section className="w-full max-w-2xl mx-auto flex flex-col pt-2">
+          <EliteSuggestionBanner onSelectNote={(note) => {
+             if (note) {
+               localStorage.setItem('elite_target_note', JSON.stringify(note));
+             } else {
+               localStorage.removeItem('elite_target_note');
+             }
+             navigate('/elite-suggestions');
+          }} />
         </section>
 
         {/* Modules Navigation Grid */}
