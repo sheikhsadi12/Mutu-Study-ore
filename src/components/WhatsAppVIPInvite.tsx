@@ -12,7 +12,7 @@ const WhatsAppIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
-const WA_LINK = "https://chat.whatsapp.com/CPgAkjaeJEY7JjMo1lx4jO?s=cl&p=a&ilr=1";
+const WA_LINK = "https://chat.whatsapp.com/DEqMmkrIUeZIt72Ad7skso?s=cl&p=a&ilr=1";
 
 export function WhatsAppBanner() {
   return (
